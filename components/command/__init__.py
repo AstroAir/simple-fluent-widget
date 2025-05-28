@@ -13,6 +13,13 @@ from .bars import (
     FluentRibbonGroup,
     FluentQuickAccessToolbar
 )
+from .menus import (
+    FluentMenu,
+    FluentContextMenu,
+    FluentCommandPalette,
+    FluentRibbon as FluentAdvancedRibbon,
+    FluentRibbonTab as FluentAdvancedRibbonTab
+)
 
 __all__ = [
     'FluentCommandBar',
@@ -20,5 +27,10 @@ __all__ = [
     'FluentRibbon',
     'FluentRibbonTab',
     'FluentRibbonGroup',
-    'FluentQuickAccessToolbar'
+    'FluentQuickAccessToolbar',
+    'FluentMenu',
+    'FluentContextMenu',
+    'FluentCommandPalette',
+    'FluentAdvancedRibbon',
+    'FluentAdvancedRibbonTab'
 ]
