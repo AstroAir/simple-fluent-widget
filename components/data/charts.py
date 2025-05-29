@@ -1,116 +1,19 @@
 """
-Fluent Design Data Visualization Components
-Charts, graphs, and data visualization widgets
+Fluent Design Basic Charts Components
+Simple and lightweight chart components with clean Fluent Design
 """
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, 
-                               QScrollArea, QSizePolicy, QGridLayout)
-from PySide6.QtCore import Qt, Signal, QTimer, QRect, QPointF
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
+from PySide6.QtCore import Qt, Signal, QRect, QPointF, QTimer
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QLinearGradient, 
-                          QRadialGradient, QPainterPath, QPolygonF)
+                          QRadialGradient, QPainterPath, QConicalGradient)
 from core.theme import theme_manager
-from core.animation import FluentAnimation
 from typing import Optional, List, Dict, Any, Tuple
 import math
 
 
-class FluentProgressRing(QWidget):
-    """Fluent Design style progress ring"""
-    
-    def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
-        
-        self._value = 0
-        self._minimum = 0
-        self._maximum = 100
-        self._text_visible = True
-        self._thickness = 8
-        
-        self.setFixedSize(80, 80)
-        self._setup_style()
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def setValue(self, value: int):
-        """Set progress value"""
-        self._value = max(self._minimum, min(self._maximum, value))
-        self.update()
-
-    def setRange(self, minimum: int, maximum: int):
-        """Set value range"""
-        self._minimum = minimum
-        self._maximum = maximum
-        self.update()
-
-    def setTextVisible(self, visible: bool):
-        """Set text visibility"""
-        self._text_visible = visible
-        self.update()
-
-    def setThickness(self, thickness: int):
-        """Set ring thickness"""
-        self._thickness = thickness
-        self.update()
-
-    def paintEvent(self, event):
-        """Paint progress ring"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        theme = theme_manager
-        
-        # Calculate dimensions
-        rect = self.rect()
-        center = rect.center()
-        radius = min(rect.width(), rect.height()) // 2 - self._thickness
-        
-        # Draw background ring
-        pen = QPen(theme.get_color('border'), self._thickness)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        painter.drawEllipse(center.x() - radius, center.y() - radius, 
-                          radius * 2, radius * 2)
-        
-        # Draw progress arc
-        if self._maximum > self._minimum:
-            progress = (self._value - self._minimum) / (self._maximum - self._minimum)
-            span_angle = int(progress * 360 * 16)  # Qt uses 1/16th degree units
-            
-            pen = QPen(theme.get_color('primary'), self._thickness)
-            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            painter.setPen(pen)
-            
-            painter.drawArc(center.x() - radius, center.y() - radius,
-                          radius * 2, radius * 2, 90 * 16, -span_angle)
-        
-        # Draw text
-        if self._text_visible:
-            painter.setPen(QPen(theme.get_color('text_primary')))
-            painter.setFont(QFont("", 12, QFont.Weight.Bold))
-            
-            if self._maximum > self._minimum:
-                percentage = int((self._value - self._minimum) / (self._maximum - self._minimum) * 100)
-                text = f"{percentage}%"
-            else:
-                text = "0%"
-            
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
-
-    def _setup_style(self):
-        """Setup style"""
-        self.setStyleSheet(f"""
-            FluentProgressRing {{
-                background-color: transparent;
-            }}
-        """)
-
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()
-        self.update()
-
-
-class FluentBarChart(QWidget):
-    """Fluent Design style bar chart"""
+class FluentSimpleBarChart(QWidget):
+    """Simple Fluent Design bar chart without animations"""
     
     bar_clicked = Signal(int, str, float)  # index, label, value
     
@@ -120,70 +23,34 @@ class FluentBarChart(QWidget):
         self._data = []  # List of (label, value, color) tuples
         self._show_values = True
         self._show_grid = True
-        self._animation_enabled = True
-        self._animated_values = []
+        self._max_value = None  # Auto-scale if None
         
-        self.setMinimumSize(300, 200)
+        self.setMinimumSize(250, 150)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        
-        self._animation_timer = QTimer()
-        self._animation_timer.timeout.connect(self._animate_bars)
         
         self._setup_style()
         theme_manager.theme_changed.connect(self._on_theme_changed)
-
+    
     def setData(self, data: List[Tuple[str, float, Optional[QColor]]]):
-        """Set chart data
-        
-        Args:
-            data: List of (label, value, color) tuples
-        """
+        """Set chart data"""
         self._data = data
-        self._animated_values = [0.0] * len(data)
-        
-        if self._animation_enabled:
-            self._start_animation()
-        else:
-            self._animated_values = [item[1] for item in data]
-            self.update()
-
+        self.update()
+    
     def setShowValues(self, show: bool):
         """Set value display visibility"""
         self._show_values = show
         self.update()
-
+    
     def setShowGrid(self, show: bool):
         """Set grid visibility"""
         self._show_grid = show
         self.update()
-
-    def setAnimationEnabled(self, enabled: bool):
-        """Set animation enabled"""
-        self._animation_enabled = enabled
-
-    def _start_animation(self):
-        """Start bar animation"""
-        self._animation_timer.start(16)  # ~60 FPS
-
-    def _animate_bars(self):
-        """Animate bar values"""
-        all_complete = True
-        
-        for i, (_, target_value, _) in enumerate(self._data):
-            current = self._animated_values[i]
-            diff = target_value - current
-            
-            if abs(diff) > 0.1:
-                self._animated_values[i] += diff * 0.1
-                all_complete = False
-            else:
-                self._animated_values[i] = target_value
-        
+    
+    def setMaxValue(self, max_value: Optional[float]):
+        """Set maximum value for Y-axis (None for auto-scale)"""
+        self._max_value = max_value
         self.update()
-        
-        if all_complete:
-            self._animation_timer.stop()
-
+    
     def paintEvent(self, event):
         """Paint bar chart"""
         if not self._data:
@@ -194,175 +61,164 @@ class FluentBarChart(QWidget):
         
         theme = theme_manager
         rect = self.rect()
-        margin = 40
-        chart_rect = QRect(margin, margin, rect.width() - 2 * margin, 
+        
+        # Calculate chart area
+        margin = 30
+        chart_rect = QRect(margin, margin, 
+                          rect.width() - 2 * margin, 
                           rect.height() - 2 * margin)
         
         # Find max value for scaling
-        max_value = max(abs(val) for _, val, _ in self._data) if self._data else 1
+        max_value = self._max_value if self._max_value else max(item[1] for item in self._data)
         if max_value == 0:
             max_value = 1
-        
-        # Draw grid
+            
+        # Draw grid if enabled
         if self._show_grid:
             self._draw_grid(painter, chart_rect, max_value)
         
         # Draw bars
-        bar_width = chart_rect.width() / len(self._data) * 0.8
-        bar_spacing = chart_rect.width() / len(self._data) * 0.2
+        bar_width = chart_rect.width() / len(self._data) * 0.7
+        bar_spacing = chart_rect.width() / len(self._data) * 0.3
         
-        for i, ((label, value, color), animated_value) in enumerate(zip(self._data, self._animated_values)):
-            x = chart_rect.left() + i * (bar_width + bar_spacing) + bar_spacing / 2
-            bar_height = (animated_value / max_value) * chart_rect.height()
-            y = chart_rect.bottom() - bar_height
+        for i, (label, value, color) in enumerate(self._data):
+            # Calculate bar dimensions
+            bar_height = (value / max_value) * chart_rect.height()
+            bar_x = chart_rect.x() + i * (bar_width + bar_spacing) + bar_spacing / 2
+            bar_y = chart_rect.bottom() - bar_height
             
-            # Use provided color or default
-            bar_color = color if color else theme.get_color('primary')
+            # Use provided color or default theme color
+            if color:
+                bar_color = color
+            else:
+                colors = [theme.get_color('primary'), theme.get_color('accent'), 
+                         theme.get_color('secondary')]
+                bar_color = colors[i % len(colors)]
             
-            # Create gradient
-            gradient = QLinearGradient(0, y, 0, chart_rect.bottom())
-            gradient.setColorAt(0, bar_color)
-            gradient.setColorAt(1, bar_color.darker(120))
+            # Draw bar
+            painter.fillRect(int(bar_x), int(bar_y), int(bar_width), int(bar_height), 
+                           QBrush(bar_color))
             
-            painter.setBrush(QBrush(gradient))
-            painter.setPen(QPen(bar_color.darker(130), 1))
-            
-            bar_rect = QRect(int(x), int(y), int(bar_width), int(bar_height))
-            painter.drawRoundedRect(bar_rect, 4, 4)
-            
-            # Draw value text
-            if self._show_values and animated_value > 0:
+            # Draw value text if enabled
+            if self._show_values and value > 0:
                 painter.setPen(QPen(theme.get_color('text_primary')))
                 painter.setFont(QFont("", 9))
                 value_text = f"{value:.1f}"
-                painter.drawText(bar_rect.adjusted(0, -20, 0, -5), 
+                painter.drawText(int(bar_x), int(bar_y - 5), int(bar_width), 15,
                                Qt.AlignmentFlag.AlignCenter, value_text)
             
             # Draw label
             painter.setPen(QPen(theme.get_color('text_secondary')))
             painter.setFont(QFont("", 8))
-            label_rect = QRect(int(x), chart_rect.bottom() + 5, 
-                             int(bar_width), 20)
-            painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
-
-    def _draw_grid(self, painter: QPainter, rect: QRect, max_value: float):
-        """Draw chart grid"""
+            painter.drawText(int(bar_x), chart_rect.bottom() + 5, int(bar_width), 15,
+                           Qt.AlignmentFlag.AlignCenter, label)
+    
+    def _draw_grid(self, painter: QPainter, chart_rect: QRect, max_value: float):
+        """Draw grid lines"""
         theme = theme_manager
-        painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DotLine))
+        painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DashLine))
         
-        # Horizontal grid lines
-        for i in range(5):
-            y = rect.top() + (rect.height() / 4) * i
-            painter.drawLine(rect.left(), int(y), rect.right(), int(y))
-            
-            # Grid value labels
-            value = max_value * (1 - i / 4)
-            painter.setPen(QPen(theme.get_color('text_secondary')))
-            painter.setFont(QFont("", 8))
-            painter.drawText(QRect(5, int(y) - 10, 30, 20), 
-                           Qt.AlignmentFlag.AlignCenter, f"{value:.1f}")
-            painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DotLine))
-
+        # Draw horizontal grid lines
+        grid_lines = 4
+        for i in range(grid_lines + 1):
+            y = chart_rect.bottom() - (i / grid_lines) * chart_rect.height()
+            painter.drawLine(chart_rect.left(), int(y), chart_rect.right(), int(y))
+    
     def mousePressEvent(self, event):
-        """Handle mouse press"""
+        """Handle bar click"""
         if not self._data:
             return
             
-        margin = 40
-        chart_rect = QRect(margin, margin, self.width() - 2 * margin, 
-                          self.height() - 2 * margin)
+        # Calculate which bar was clicked
+        margin = 30
+        chart_rect = QRect(margin, margin, 
+                          self.rect().width() - 2 * margin, 
+                          self.rect().height() - 2 * margin)
         
-        bar_width = chart_rect.width() / len(self._data) * 0.8
-        bar_spacing = chart_rect.width() / len(self._data) * 0.2
+        bar_width = chart_rect.width() / len(self._data) * 0.7
+        bar_spacing = chart_rect.width() / len(self._data) * 0.3
         
-        for i, (label, value, _) in enumerate(self._data):
-            x = chart_rect.left() + i * (bar_width + bar_spacing) + bar_spacing / 2
-            bar_rect = QRect(int(x), chart_rect.top(), int(bar_width), chart_rect.height())
+        for i, (label, value, color) in enumerate(self._data):
+            bar_x = chart_rect.x() + i * (bar_width + bar_spacing) + bar_spacing / 2
             
-            if bar_rect.contains(event.pos()):
+            if bar_x <= event.x() <= bar_x + bar_width:
                 self.bar_clicked.emit(i, label, value)
                 break
-
+        
+        super().mousePressEvent(event)
+    
     def _setup_style(self):
         """Setup style"""
-        theme = theme_manager
         self.setStyleSheet(f"""
-            FluentBarChart {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: 8px;
+            FluentSimpleBarChart {{
+                background-color: transparent;
+                border: none;
             }}
         """)
-
+    
     def _on_theme_changed(self, _):
         """Handle theme change"""
         self._setup_style()
         self.update()
 
 
-class FluentLineChart(QWidget):
-    """Fluent Design style line chart"""
+class FluentSimpleLineChart(QWidget):
+    """Simple Fluent Design line chart without animations"""
     
     point_clicked = Signal(int, float, float)  # index, x_value, y_value
     
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         
-        self._data_series = []  # List of (name, data_points, color) tuples
+        self._data_series = []  # List of data series
         self._show_points = True
         self._show_grid = True
-        self._smooth_lines = True
+        self._smooth_curves = False
         
-        self.setMinimumSize(400, 250)
+        self.setMinimumSize(300, 200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         self._setup_style()
         theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def addSeries(self, name: str, data_points: List[Tuple[float, float]], 
-                  color: Optional[QColor] = None):
-        """Add data series
-        
-        Args:
-            name: Series name
-            data_points: List of (x, y) value tuples
-            color: Line color (optional)
-        """
-        if not color:
-            # Use different colors for each series
-            colors = [
-                theme_manager.get_color('primary'),
-                QColor("#28a745"),
-                QColor("#ffc107"),
-                QColor("#dc3545"),
-                QColor("#17a2b8"),
-                QColor("#6f42c1")
-            ]
+    
+    def addDataSeries(self, name: str, data: List[Tuple[float, float]], 
+                     color: Optional[QColor] = None):
+        """Add a data series"""
+        if color is None:
+            colors = [theme_manager.get_color('primary'), 
+                     theme_manager.get_color('accent'),
+                     theme_manager.get_color('secondary'),
+                     theme_manager.get_color('success')]
             color = colors[len(self._data_series) % len(colors)]
         
-        self._data_series.append((name, data_points, color))
+        self._data_series.append({
+            'name': name,
+            'data': data,
+            'color': color
+        })
+        
         self.update()
-
-    def clearSeries(self):
-        """Clear all data series"""
-        self._data_series.clear()
-        self.update()
-
+    
     def setShowPoints(self, show: bool):
-        """Set point markers visibility"""
+        """Set point visibility"""
         self._show_points = show
         self.update()
-
+    
     def setShowGrid(self, show: bool):
         """Set grid visibility"""
         self._show_grid = show
         self.update()
-
-    def setSmoothLines(self, smooth: bool):
-        """Set line smoothing"""
-        self._smooth_lines = smooth
+    
+    def setSmoothCurves(self, smooth: bool):
+        """Set smooth curve rendering"""
+        self._smooth_curves = smooth
         self.update()
-
+    
+    def clearData(self):
+        """Clear all data series"""
+        self._data_series.clear()
+        self.update()
+    
     def paintEvent(self, event):
         """Paint line chart"""
         if not self._data_series:
@@ -373,132 +229,125 @@ class FluentLineChart(QWidget):
         
         theme = theme_manager
         rect = self.rect()
-        margin = 50
-        chart_rect = QRect(margin, margin, rect.width() - 2 * margin, 
+        
+        # Calculate chart area
+        margin = 40
+        chart_rect = QRect(margin, margin, 
+                          rect.width() - 2 * margin, 
                           rect.height() - 2 * margin)
         
-        # Find value ranges
-        all_x = []
-        all_y = []
-        for _, points, _ in self._data_series:
-            for x, y in points:
-                all_x.append(x)
-                all_y.append(y)
+        # Find data bounds
+        all_points = []
+        for series in self._data_series:
+            all_points.extend(series['data'])
         
-        if not all_x or not all_y:
+        if not all_points:
             return
             
-        min_x, max_x = min(all_x), max(all_x)
-        min_y, max_y = min(all_y), max(all_y)
+        min_x = min(point[0] for point in all_points)
+        max_x = max(point[0] for point in all_points)
+        min_y = min(point[1] for point in all_points)
+        max_y = max(point[1] for point in all_points)
         
         # Add padding to ranges
         x_range = max_x - min_x if max_x != min_x else 1
         y_range = max_y - min_y if max_y != min_y else 1
         
-        min_x -= x_range * 0.05
-        max_x += x_range * 0.05
-        min_y -= y_range * 0.05
-        max_y += y_range * 0.05
-        
-        # Draw grid
+        # Draw grid if enabled
         if self._show_grid:
             self._draw_chart_grid(painter, chart_rect, min_x, max_x, min_y, max_y)
         
-        # Draw series
-        for name, points, color in self._data_series:
-            if len(points) < 2:
-                continue
-                
-            # Convert points to screen coordinates
-            screen_points = []
-            for x, y in points:
-                screen_x = chart_rect.left() + (x - min_x) / (max_x - min_x) * chart_rect.width()
-                screen_y = chart_rect.bottom() - (y - min_y) / (max_y - min_y) * chart_rect.height()
-                screen_points.append(QPointF(screen_x, screen_y))
-            
-            # Draw line
-            pen = QPen(color, 2)
-            painter.setPen(pen)
-            
-            if self._smooth_lines and len(screen_points) > 2:
-                # Draw smooth curve
-                path = QPainterPath()
-                path.moveTo(screen_points[0])
-                
-                for i in range(1, len(screen_points)):
-                    if i == len(screen_points) - 1:
-                        path.lineTo(screen_points[i])
-                    else:
-                        # Simple curve approximation
-                        cp1 = screen_points[i - 1]
-                        cp2 = screen_points[i]
-                        path.quadTo(cp1, cp2)
-                
-                painter.drawPath(path)
-            else:
-                # Draw straight lines
-                for i in range(len(screen_points) - 1):
-                    painter.drawLine(screen_points[i], screen_points[i + 1])
-            
-            # Draw points
-            if self._show_points:
-                painter.setBrush(QBrush(color))
-                painter.setPen(QPen(color.darker(120), 1))
-                
-                for point in screen_points:
-                    painter.drawEllipse(point, 4, 4)
-
-    def _draw_chart_grid(self, painter: QPainter, rect: QRect, 
+        # Draw data series
+        for series in self._data_series:
+            self._draw_series(painter, chart_rect, series, 
+                            min_x, max_x, min_y, max_y)
+    
+    def _draw_chart_grid(self, painter: QPainter, chart_rect: QRect,
                         min_x: float, max_x: float, min_y: float, max_y: float):
-        """Draw chart grid and axes"""
+        """Draw chart grid"""
         theme = theme_manager
-        painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DotLine))
+        painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DashLine))
         
-        # Vertical grid lines
-        for i in range(6):
-            x = rect.left() + (rect.width() / 5) * i
-            painter.drawLine(int(x), rect.top(), int(x), rect.bottom())
-            
-            # X-axis labels
-            value = min_x + (max_x - min_x) * (i / 5)
-            painter.setPen(QPen(theme.get_color('text_secondary')))
-            painter.setFont(QFont("", 8))
-            painter.drawText(QRect(int(x) - 20, rect.bottom() + 5, 40, 20), 
-                           Qt.AlignmentFlag.AlignCenter, f"{value:.1f}")
-            painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DotLine))
+        # Draw vertical grid lines
+        grid_lines = 5
+        for i in range(grid_lines + 1):
+            x = chart_rect.left() + (i / grid_lines) * chart_rect.width()
+            painter.drawLine(int(x), chart_rect.top(), int(x), chart_rect.bottom())
         
-        # Horizontal grid lines
-        for i in range(6):
-            y = rect.top() + (rect.height() / 5) * i
-            painter.drawLine(rect.left(), int(y), rect.right(), int(y))
+        # Draw horizontal grid lines
+        for i in range(grid_lines + 1):
+            y = chart_rect.bottom() - (i / grid_lines) * chart_rect.height()
+            painter.drawLine(chart_rect.left(), int(y), chart_rect.right(), int(y))
+    
+    def _draw_series(self, painter: QPainter, chart_rect: QRect, series: Dict,
+                    min_x: float, max_x: float, min_y: float, max_y: float):
+        """Draw a data series"""
+        data = series['data']
+        color = series['color']
+        
+        if len(data) < 2:
+            return
+        
+        # Convert data points to screen coordinates
+        points = []
+        x_range = max_x - min_x if max_x != min_x else 1
+        y_range = max_y - min_y if max_y != min_y else 1
+        
+        for x_val, y_val in data:
+            x = chart_rect.left() + ((x_val - min_x) / x_range) * chart_rect.width()
+            y = chart_rect.bottom() - ((y_val - min_y) / y_range) * chart_rect.height()
+            points.append(QPointF(x, y))
+        
+        # Draw line
+        painter.setPen(QPen(color, 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        
+        if self._smooth_curves and len(points) > 2:
+            # Draw smooth curve
+            path = QPainterPath()
+            path.moveTo(points[0])
             
-            # Y-axis labels
-            value = max_y - (max_y - min_y) * (i / 5)
-            painter.setPen(QPen(theme.get_color('text_secondary')))
-            painter.setFont(QFont("", 8))
-            painter.drawText(QRect(5, int(y) - 10, 35, 20), 
-                           Qt.AlignmentFlag.AlignCenter, f"{value:.1f}")
-            painter.setPen(QPen(theme.get_color('border'), 1, Qt.PenStyle.DotLine))
-
+            for i in range(1, len(points)):
+                if i == 1:
+                    path.lineTo(points[i])
+                else:
+                    # Create smooth curve using quadratic bezier
+                    control_point = QPointF(
+                        (points[i-1].x() + points[i].x()) / 2,
+                        (points[i-1].y() + points[i].y()) / 2
+                    )
+                    path.quadTo(control_point, points[i])
+            
+            painter.drawPath(path)
+        else:
+            # Draw straight lines
+            for i in range(len(points) - 1):
+                painter.drawLine(points[i], points[i + 1])
+        
+        # Draw points if enabled
+        if self._show_points:
+            painter.setPen(QPen(color.darker(120), 2))
+            painter.setBrush(QBrush(color.lighter(120)))
+            
+            for point in points:
+                painter.drawEllipse(point, 3, 3)
+    
     def _setup_style(self):
         """Setup style"""
-        theme = theme_manager
         self.setStyleSheet(f"""
-            FluentLineChart {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: 8px;
+            FluentSimpleLineChart {{
+                background-color: transparent;
+                border: none;
             }}
         """)
-
+    
     def _on_theme_changed(self, _):
         """Handle theme change"""
         self._setup_style()
         self.update()
 
 
-class FluentPieChart(QWidget):
-    """Fluent Design style pie chart"""
+class FluentSimplePieChart(QWidget):
+    """Simple Fluent Design pie chart without animations"""
     
     slice_clicked = Signal(int, str, float)  # index, label, value
     
@@ -508,34 +357,28 @@ class FluentPieChart(QWidget):
         self._data = []  # List of (label, value, color) tuples
         self._show_labels = True
         self._show_percentages = True
-        self._exploded_slice = -1
         
-        self.setMinimumSize(250, 250)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setMinimumSize(200, 200)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         
         self._setup_style()
         theme_manager.theme_changed.connect(self._on_theme_changed)
-
+    
     def setData(self, data: List[Tuple[str, float, Optional[QColor]]]):
         """Set pie chart data"""
         self._data = data
         self.update()
-
+    
     def setShowLabels(self, show: bool):
         """Set label visibility"""
         self._show_labels = show
         self.update()
-
+    
     def setShowPercentages(self, show: bool):
         """Set percentage visibility"""
         self._show_percentages = show
         self.update()
-
-    def explodeSlice(self, index: int):
-        """Explode a pie slice"""
-        self._exploded_slice = index
-        self.update()
-
+    
     def paintEvent(self, event):
         """Paint pie chart"""
         if not self._data:
@@ -544,129 +387,272 @@ class FluentPieChart(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
+        theme = theme_manager
         rect = self.rect()
-        center = rect.center()
-        radius = min(rect.width(), rect.height()) // 2 - 50
         
-        # Calculate total value
-        total_value = sum(value for _, value, _ in self._data)
-        if total_value == 0:
-            return
+        # Calculate chart area
+        margin = 15
+        chart_size = min(rect.width(), rect.height()) - 2 * margin
+        chart_rect = QRect((rect.width() - chart_size) // 2,
+                          (rect.height() - chart_size) // 2,
+                          chart_size, chart_size)
         
         # Draw slices
         start_angle = 0
+        total_value = sum(item[1] for item in self._data) if self._data else 1
         
         for i, (label, value, color) in enumerate(self._data):
-            span_angle = int((value / total_value) * 360 * 16)  # Qt uses 1/16th degree units
+            angle = (value / total_value) * 360
             
-            # Use provided color or generate one
-            if not color:
-                colors = [
-                    theme_manager.get_color('primary'),
-                    QColor("#28a745"),
-                    QColor("#ffc107"),
-                    QColor("#dc3545"),
-                    QColor("#17a2b8"),
-                    QColor("#6f42c1"),
-                    QColor("#fd7e14"),
-                    QColor("#20c997")
-                ]
-                color = colors[i % len(colors)]
-            
-            # Calculate slice position
-            slice_center = QPointF(center)
-            if i == self._exploded_slice:
-                # Move exploded slice outward
-                angle_rad = math.radians((start_angle + span_angle // 2) / 16)
-                offset_x = math.cos(angle_rad) * 15
-                offset_y = math.sin(angle_rad) * 15
-                slice_center = QPointF(center.x() + offset_x, center.y() + offset_y)
-            
-            # Create gradient
-            gradient = QRadialGradient(slice_center, radius)
-            gradient.setColorAt(0, color.lighter(120))
-            gradient.setColorAt(1, color)
-            
-            painter.setBrush(QBrush(gradient))
-            painter.setPen(QPen(color.darker(120), 2))
+            # Use provided color or default theme color
+            if color:
+                slice_color = color
+            else:
+                colors = [theme.get_color('primary'), theme.get_color('accent'), 
+                         theme.get_color('secondary'), theme.get_color('success'),
+                         theme.get_color('warning'), theme.get_color('error')]
+                slice_color = colors[i % len(colors)]
             
             # Draw slice
-            pie_rect = QRect(int(slice_center.x() - radius), int(slice_center.y() - radius),
-                           radius * 2, radius * 2)
-            painter.drawPie(pie_rect, start_angle, span_angle)
+            painter.setBrush(QBrush(slice_color))
+            painter.setPen(QPen(theme.get_color('surface'), 2))
+            painter.drawPie(chart_rect, int(start_angle * 16), int(angle * 16))
             
-            # Draw label
-            if self._show_labels or self._show_percentages:
-                angle_rad = math.radians((start_angle + span_angle // 2) / 16)
-                label_x = center.x() + math.cos(angle_rad) * (radius + 20)
-                label_y = center.y() + math.sin(angle_rad) * (radius + 20)
+            # Draw label if enabled
+            if self._show_labels and angle > 15:  # Only show label if slice is large enough
+                label_angle = start_angle + angle / 2
+                label_radius = chart_size // 2 * 0.7
                 
-                text_parts = []
-                if self._show_labels:
-                    text_parts.append(label)
+                label_x = chart_rect.center().x() + label_radius * math.cos(math.radians(label_angle))
+                label_y = chart_rect.center().y() + label_radius * math.sin(math.radians(label_angle))
+                
+                painter.setPen(QPen(Qt.GlobalColor.white))
+                painter.setFont(QFont("", 9, QFont.Weight.Bold))
+                
+                display_text = label
                 if self._show_percentages:
                     percentage = (value / total_value) * 100
-                    text_parts.append(f"({percentage:.1f}%)")
+                    display_text += f"\n{percentage:.1f}%"
                 
-                text = " ".join(text_parts)
-                
-                painter.setPen(QPen(theme_manager.get_color('text_primary')))
-                painter.setFont(QFont("", 9))
-                
-                # Calculate text position
-                metrics = painter.fontMetrics()
-                text_width = metrics.horizontalAdvance(text)
-                text_height = metrics.height()
-                
-                text_rect = QRect(int(label_x - text_width // 2), 
-                                int(label_y - text_height // 2),
-                                text_width, text_height)
-                painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, text)
+                # Draw text centered
+                text_rect = QRect(int(label_x - 30), int(label_y - 10), 60, 20)
+                painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, display_text)
             
-            start_angle += span_angle
-
+            start_angle += angle
+    
     def mousePressEvent(self, event):
-        """Handle mouse press"""
+        """Handle slice click"""
         if not self._data:
             return
-            
+        
+        # Calculate which slice was clicked
         center = self.rect().center()
         click_pos = event.pos()
         
         # Calculate angle from center to click position
         dx = click_pos.x() - center.x()
         dy = click_pos.y() - center.y()
-        
         click_angle = math.degrees(math.atan2(dy, dx))
         if click_angle < 0:
             click_angle += 360
         
-        # Find which slice was clicked
-        total_value = sum(value for _, value, _ in self._data)
-        current_angle = 0
+        # Find which slice contains this angle
+        start_angle = 0
+        total_value = sum(item[1] for item in self._data) if self._data else 1
         
-        for i, (label, value, _) in enumerate(self._data):
-            slice_angle = (value / total_value) * 360
+        for i, (label, value, color) in enumerate(self._data):
+            angle = (value / total_value) * 360
             
-            if current_angle <= click_angle <= current_angle + slice_angle:
+            if start_angle <= click_angle <= start_angle + angle:
                 self.slice_clicked.emit(i, label, value)
-                self.explodeSlice(i)
                 break
-                
-            current_angle += slice_angle
-
+            
+            start_angle += angle
+        
+        super().mousePressEvent(event)
+    
     def _setup_style(self):
         """Setup style"""
-        theme = theme_manager
         self.setStyleSheet(f"""
-            FluentPieChart {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: 8px;
+            FluentSimplePieChart {{
+                background-color: transparent;
+                border: none;
             }}
         """)
-
+    
     def _on_theme_changed(self, _):
         """Handle theme change"""
         self._setup_style()
         self.update()
+
+
+class FluentGaugeChart(QWidget):
+    """Fluent Design gauge chart component"""
+    
+    value_changed = Signal(float)  # current_value
+    
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        
+        self._min_value = 0
+        self._max_value = 100
+        self._current_value = 0
+        self._target_value = 0
+        self._title = "Gauge"
+        self._unit = "%"
+        self._show_value = True
+        self._show_title = True
+        
+        # Color zones: [(start, end, color), ...]
+        self._color_zones = [
+            (0, 30, theme_manager.get_color('error')),
+            (30, 70, theme_manager.get_color('warning')),
+            (70, 100, theme_manager.get_color('success'))
+        ]
+        
+        self.setMinimumSize(150, 150)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        
+        # Animation timer
+        self._animation_timer = QTimer()
+        self._animation_timer.timeout.connect(self._animate_value)
+        
+        self._setup_style()
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+    
+    def setValue(self, value: float, animate: bool = True):
+        """Set gauge value with optional animation"""
+        self._target_value = max(self._min_value, min(self._max_value, value))
+        
+        if animate:
+            self._animation_timer.start(16)  # ~60 FPS
+        else:
+            self._current_value = self._target_value
+            self.update()
+            self.value_changed.emit(self._current_value)
+    
+    def setRange(self, min_value: float, max_value: float):
+        """Set gauge range"""
+        self._min_value = min_value
+        self._max_value = max_value
+        self.update()
+    
+    def setTitle(self, title: str):
+        """Set gauge title"""
+        self._title = title
+        self.update()
+    
+    def setUnit(self, unit: str):
+        """Set value unit"""
+        self._unit = unit
+        self.update()
+    
+    def setColorZones(self, zones: List[Tuple[float, float, QColor]]):
+        """Set color zones: [(start, end, color), ...]"""
+        self._color_zones = zones
+        self.update()
+    
+    def paintEvent(self, event):
+        """Paint gauge chart"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        theme = theme_manager
+        rect = self.rect()
+        
+        # Calculate gauge area
+        margin = 20
+        gauge_size = min(rect.width(), rect.height()) - 2 * margin
+        gauge_rect = QRect((rect.width() - gauge_size) // 2,
+                          (rect.height() - gauge_size) // 2,
+                          gauge_size, gauge_size)
+        
+        center = gauge_rect.center()
+        radius = gauge_size // 2 - 10
+        
+        # Draw background arc
+        painter.setPen(QPen(theme.get_color('border'), 8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        start_angle = 225 * 16  # Start at bottom-left
+        span_angle = 270 * 16   # 3/4 circle
+        painter.drawArc(gauge_rect.adjusted(10, 10, -10, -10), start_angle, span_angle)
+        
+        # Draw color zones
+        zone_angle_range = 270
+        for zone_start, zone_end, zone_color in self._color_zones:
+            zone_start_norm = (zone_start - self._min_value) / (self._max_value - self._min_value)
+            zone_end_norm = (zone_end - self._min_value) / (self._max_value - self._min_value)
+            
+            zone_start_angle = start_angle + int(zone_start_norm * zone_angle_range * 16)
+            zone_span_angle = int((zone_end_norm - zone_start_norm) * zone_angle_range * 16)
+            
+            painter.setPen(QPen(zone_color, 8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawArc(gauge_rect.adjusted(10, 10, -10, -10), zone_start_angle, zone_span_angle)
+        
+        # Draw value arc
+        value_norm = (self._current_value - self._min_value) / (self._max_value - self._min_value)
+        value_span_angle = int(value_norm * zone_angle_range * 16)
+        
+        # Get color for current value
+        current_color = theme.get_color('primary')
+        for zone_start, zone_end, zone_color in self._color_zones:
+            if zone_start <= self._current_value <= zone_end:
+                current_color = zone_color
+                break
+        
+        painter.setPen(QPen(current_color, 12, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(gauge_rect.adjusted(10, 10, -10, -10), start_angle, value_span_angle)
+        
+        # Draw center circle
+        painter.setBrush(QBrush(theme.get_color('surface')))
+        painter.setPen(QPen(theme.get_color('border'), 2))
+        center_size = 20
+        painter.drawEllipse(center.x() - center_size // 2, center.y() - center_size // 2, 
+                          center_size, center_size)
+        
+        # Draw value text
+        if self._show_value:
+            painter.setPen(QPen(theme.get_color('text_primary')))
+            painter.setFont(QFont("", 14, QFont.Weight.Bold))
+            value_text = f"{self._current_value:.1f}{self._unit}"
+            painter.drawText(gauge_rect.adjusted(0, 30, 0, 0), Qt.AlignmentFlag.AlignCenter, value_text)
+        
+        # Draw title
+        if self._show_title:
+            painter.setPen(QPen(theme.get_color('text_secondary')))
+            painter.setFont(QFont("", 10))
+            painter.drawText(gauge_rect.adjusted(0, -30, 0, 0), Qt.AlignmentFlag.AlignCenter, self._title)
+    
+    def _animate_value(self):
+        """Animate value change"""
+        diff = self._target_value - self._current_value
+        if abs(diff) < 0.1:
+            self._current_value = self._target_value
+            self._animation_timer.stop()
+        else:
+            self._current_value += diff * 0.1
+        
+        self.update()
+        self.value_changed.emit(self._current_value)
+    
+    def _setup_style(self):
+        """Setup style"""
+        self.setStyleSheet(f"""
+            FluentGaugeChart {{
+                background-color: transparent;
+                border: none;
+            }}
+        """)
+    
+    def _on_theme_changed(self, _):
+        """Handle theme change"""
+        self._setup_style()
+        self.update()
+
+
+# Export all basic chart components
+__all__ = [
+    'FluentSimpleBarChart',
+    'FluentSimpleLineChart', 
+    'FluentSimplePieChart',
+    'FluentGaugeChart'
+]

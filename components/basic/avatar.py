@@ -4,18 +4,20 @@ User avatar display with various styles and sizes
 """
 
 from PySide6.QtWidgets import QWidget, QHBoxLayout
-from PySide6.QtCore import Qt, Signal, QSize, Property, QPropertyAnimation, QByteArray
+from PySide6.QtCore import Qt, Signal, QSize, Property, QPropertyAnimation, QByteArray, QTimer
 from PySide6.QtGui import (QPainter, QPen, QBrush, QColor, QPixmap, QFont,
-                           QPainterPath)
+                           QPainterPath, QPaintEvent, QEnterEvent)
 from core.theme import theme_manager
 from core.animation import FluentAnimation
+from core.enhanced_animations import (FluentTransition, FluentMicroInteraction,
+                                      FluentRevealEffect, FluentSequence)
 from typing import Optional
 from enum import Enum
 import hashlib
 
 
 class FluentAvatar(QWidget):
-    """Fluent Design avatar component"""
+    """Fluent Design avatar component with enhanced animations"""
 
     class Size(Enum):
         SMALL = 24
@@ -55,20 +57,21 @@ class FluentAvatar(QWidget):
         self._background_color = None
         self._hover_progress = 0.0
         self._press_progress = 0.0
+        self._scale_progress = 1.0
 
         self._setup_ui()
         self._setup_style()
-        self._setup_animations()
+        self._setup_enhanced_animations()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_ui(self):
-        """Setup UI"""
+        """Setup UI components"""
         self.setFixedSize(self._size.value, self._size.value)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
     def _setup_style(self):
-        """Setup style"""
+        """Setup component style"""
         if self._background_color is None:
             self._bg_color = theme_manager.get_color('accent_light')
         else:
@@ -81,26 +84,59 @@ class FluentAvatar(QWidget):
 
         self.update()
 
-    def _setup_animations(self):
-        """Setup animations"""
-        # 修复：使用 QByteArray 代替字节字符串
+    def _setup_enhanced_animations(self):
+        """Setup enhanced animation system"""
+        # Enhanced hover animation
         self._hover_animation = QPropertyAnimation(
             self, QByteArray(b"hover_progress"))
         self._hover_animation.setDuration(FluentAnimation.DURATION_FAST)
-        self._hover_animation.setEasingCurve(FluentAnimation.EASE_OUT)
+        self._hover_animation.setEasingCurve(FluentTransition.EASE_SMOOTH)
 
-        # 修复：使用 QByteArray 代替字节字符串
+        # Enhanced press animation
         self._press_animation = QPropertyAnimation(
             self, QByteArray(b"press_progress"))
-        self._press_animation.setDuration(FluentAnimation.DURATION_FAST)
-        self._press_animation.setEasingCurve(FluentAnimation.EASE_OUT)
+        self._press_animation.setDuration(FluentAnimation.DURATION_ULTRA_FAST)
+        self._press_animation.setEasingCurve(FluentTransition.EASE_CRISP)
 
-    def paintEvent(self, event):
-        """Custom paint event"""
+        # Scale animation for interactions
+        self._scale_animation = QPropertyAnimation(
+            self, QByteArray(b"scale_progress"))
+        self._scale_animation.setDuration(FluentAnimation.DURATION_FAST)
+        self._scale_animation.setEasingCurve(FluentTransition.EASE_SPRING)
+
+        # Entrance animation
+        QTimer.singleShot(50, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation with enhanced effects"""
+        entrance_sequence = FluentSequence(self)
+
+        # Fade in effect
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.fade_in(self, 300))
+        entrance_sequence.addPause(100)
+
+        # Scale in effect
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.scale_in(self, 250))
+
+        entrance_sequence.start()
+
+    def paintEvent(self, event: QPaintEvent):
+        """Custom paint event with enhanced rendering"""
+        _ = event  # Mark parameter as used
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         rect = self.rect()
+
+        # Apply scale transformation for animations
+        if self._scale_progress != 1.0:
+            center = rect.center()
+            painter.translate(center)
+            painter.scale(self._scale_progress, self._scale_progress)
+            painter.translate(-center)
 
         # Create clipping path
         path = QPainterPath()
@@ -114,10 +150,10 @@ class FluentAvatar(QWidget):
 
         painter.setClipPath(path)
 
-        # Draw background
+        # Draw background with enhanced styling
         self._draw_background(painter, rect)
 
-        # Draw content
+        # Draw content based on style
         if self._style == self.Style.PHOTO and self._pixmap:
             self._draw_photo(painter, rect)
         elif self._style == self.Style.INITIALS and self._initials:
@@ -127,16 +163,16 @@ class FluentAvatar(QWidget):
         else:
             self._draw_placeholder(painter, rect)
 
-        # Draw border
+        # Draw border with enhanced styling
         if self._border_width > 0:
             self._draw_border(painter, rect, path)
 
-        # Draw hover/press effects
+        # Draw enhanced interaction effects
         if self._clickable:
             self._draw_interaction_effects(painter, rect, path)
 
     def _draw_background(self, painter: QPainter, rect):
-        """Draw background"""
+        """Draw background with enhanced styling"""
         if self._style == self.Style.PHOTO and self._pixmap:
             # Photo background is handled in _draw_photo
             return
@@ -148,14 +184,20 @@ class FluentAvatar(QWidget):
         else:
             bg_color = self._bg_color
 
+        # Apply hover effect to background
+        if self._hover_progress > 0:
+            overlay_color = QColor(
+                255, 255, 255, int(20 * self._hover_progress))
+            bg_color = self._blend_colors(bg_color, overlay_color)
+
         painter.fillRect(rect, bg_color)
 
     def _draw_photo(self, painter: QPainter, rect):
-        """Draw photo"""
+        """Draw photo with enhanced rendering"""
         if not self._pixmap:
             return
 
-        # Scale pixmap to fit
+        # Scale pixmap to fit with smooth transformation
         scaled_pixmap = self._pixmap.scaled(
             rect.size(),
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
@@ -166,26 +208,36 @@ class FluentAvatar(QWidget):
         x = (rect.width() - scaled_pixmap.width()) // 2
         y = (rect.height() - scaled_pixmap.height()) // 2
 
+        # Apply opacity based on hover state
+        if self._hover_progress > 0:
+            painter.setOpacity(0.9 + 0.1 * self._hover_progress)
+
         painter.drawPixmap(x, y, scaled_pixmap)
+        painter.setOpacity(1.0)
 
     def _draw_initials(self, painter: QPainter, rect):
-        """Draw initials"""
-        # Set font
+        """Draw initials with enhanced typography"""
+        # Set enhanced font
         font = QFont()
         font_size = max(8, int(rect.height() * 0.4))
         font.setPointSize(font_size)
         font.setWeight(QFont.Weight.Bold)
+        font.setStyleHint(QFont.StyleHint.SansSerif)
         painter.setFont(font)
 
-        # Set text color
-        painter.setPen(QPen(QColor(255, 255, 255)))
+        # Set text color with hover effect
+        text_color = QColor(255, 255, 255)
+        if self._hover_progress > 0:
+            text_color.setAlpha(int(255 * (0.8 + 0.2 * self._hover_progress)))
 
-        # Draw text
+        painter.setPen(QPen(text_color))
+
+        # Draw text with enhanced alignment
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self._initials)
 
     def _draw_icon(self, painter: QPainter, rect):
-        """Draw icon"""
-        # For now, draw a simple person icon
+        """Draw icon with enhanced styling"""
+        # Enhanced icon size calculation
         icon_size = int(rect.height() * 0.6)
         icon_rect = rect.adjusted(
             (rect.width() - icon_size) // 2,
@@ -194,10 +246,15 @@ class FluentAvatar(QWidget):
             -(rect.height() - icon_size) // 2
         )
 
-        painter.setPen(QPen(QColor(255, 255, 255), 2))
+        # Enhanced pen with hover effect
+        pen_color = QColor(255, 255, 255)
+        if self._hover_progress > 0:
+            pen_color.setAlpha(int(255 * (0.8 + 0.2 * self._hover_progress)))
+
+        painter.setPen(QPen(pen_color, 2))
         painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
 
-        # Draw simple person silhouette
+        # Draw enhanced person silhouette
         head_rect = icon_rect.adjusted(
             icon_size // 4, 0, -icon_size // 4, -icon_size // 2
         )
@@ -209,49 +266,87 @@ class FluentAvatar(QWidget):
         painter.drawEllipse(body_rect)
 
     def _draw_placeholder(self, painter: QPainter, rect):
-        """Draw placeholder"""
+        """Draw placeholder with enhanced styling"""
         self._draw_icon(painter, rect)
 
-    def _draw_border(self, painter: QPainter, rect_obj, path: QPainterPath):
-        """Draw border"""
+    def _draw_border(self, painter: QPainter, rect, path: QPainterPath):
+        """Draw border with enhanced styling"""
+        _ = rect  # Mark parameter as used
+
         painter.setClipping(False)
 
-        pen = QPen(self._border_col, self._border_width)
+        # Enhanced border with hover effect
+        border_color = self._border_col
+        if self._hover_progress > 0:
+            border_color = border_color.lighter(
+                int(110 + 20 * self._hover_progress))
+
+        pen = QPen(border_color, self._border_width)
         painter.setPen(pen)
         painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
         painter.drawPath(path)
 
-    def _draw_interaction_effects(self, painter: QPainter, rect_obj, path: QPainterPath):
-        """Draw hover and press effects"""
+    def _draw_interaction_effects(self, painter: QPainter, rect, path: QPainterPath):
+        """Draw enhanced hover and press effects"""
+        _ = rect  # Mark parameter as used
+
         if self._hover_progress > 0 or self._press_progress > 0:
             painter.setClipping(False)
 
-            # Overlay color
-            overlay_color = QColor(
-                255, 255, 255, int(30 * self._hover_progress))
+            # Enhanced overlay effects
             if self._press_progress > 0:
-                overlay_color = QColor(0, 0, 0, int(20 * self._press_progress))
-
-            painter.fillPath(path, overlay_color)
+                # Press effect: darker overlay
+                overlay_color = QColor(0, 0, 0, int(30 * self._press_progress))
+                painter.fillPath(path, overlay_color)
+            elif self._hover_progress > 0:
+                # Hover effect: lighter overlay with subtle glow
+                overlay_color = QColor(
+                    255, 255, 255, int(25 * self._hover_progress))
+                painter.fillPath(path, overlay_color)
 
     def _generate_color_from_string(self, text: str) -> QColor:
-        """Generate a consistent color from string"""
+        """Generate a consistent color from string with enhanced algorithm"""
         # Create hash from text
         hash_object = hashlib.md5(text.encode())
         hex_dig = hash_object.hexdigest()
 
-        # Extract RGB values
+        # Extract RGB values with better distribution
         r = int(hex_dig[0:2], 16)
         g = int(hex_dig[2:4], 16)
         b = int(hex_dig[4:6], 16)
 
-        # Adjust for better contrast
-        r = (r % 180) + 75
-        g = (g % 180) + 75
-        b = (b % 180) + 75
+        # Enhanced color adjustment for better contrast and aesthetics
+        r = (r % 150) + 80
+        g = (g % 150) + 80
+        b = (b % 150) + 80
+
+        # Ensure color isn't too dark or too light
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        if luminance < 100:
+            # Too dark, lighten it
+            r = min(255, r + 50)
+            g = min(255, g + 50)
+            b = min(255, b + 50)
+        elif luminance > 200:
+            # Too light, darken it
+            r = max(0, r - 50)
+            g = max(0, g - 50)
+            b = max(0, b - 50)
 
         return QColor(r, g, b)
 
+    def _blend_colors(self, base: QColor, overlay: QColor) -> QColor:
+        """Blend two colors with alpha blending"""
+        alpha = overlay.alpha() / 255.0
+        inv_alpha = 1.0 - alpha
+
+        r = int(overlay.red() * alpha + base.red() * inv_alpha)
+        g = int(overlay.green() * alpha + base.green() * inv_alpha)
+        b = int(overlay.blue() * alpha + base.blue() * inv_alpha)
+
+        return QColor(r, g, b)
+
+    # Enhanced property getters and setters
     def _get_hover_progress(self):
         return self._hover_progress
 
@@ -266,87 +361,120 @@ class FluentAvatar(QWidget):
         self._press_progress = value
         self.update()
 
-    # 修复：添加缺少的 user 和 notify 参数
-    hover_progress = Property(
-        float, _get_hover_progress, _set_hover_progress, None, "", user=True)
-    press_progress = Property(
-        float, _get_press_progress, _set_press_progress, None, "", user=True)
+    def _get_scale_progress(self):
+        return self._scale_progress
 
-    def setSize(self, size: Size):
-        """Set avatar size"""
-        self._size = size
-        self.setFixedSize(size.value, size.value)
+    def _set_scale_progress(self, value):
+        self._scale_progress = value
         self.update()
 
-    # 修复：重命名方法以避免与基类方法冲突，或使返回类型兼容
+    # Enhanced Qt properties
+    hover_progress = Property(
+        float, _get_hover_progress, _set_hover_progress, None, "")
+    press_progress = Property(
+        float, _get_press_progress, _set_press_progress, None, "")
+    scale_progress = Property(
+        float, _get_scale_progress, _set_scale_progress, None, "")
+
+    # Public API methods with enhanced functionality
+    def setSize(self, size: Size):
+        """Set avatar size with animation"""
+        if self._size != size:
+            self._size = size
+
+            # Animate size change
+            old_size = self.size()
+            new_size = QSize(size.value, size.value)
+
+            size_animation = QPropertyAnimation(self, QByteArray(b"size"))
+            size_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
+            size_animation.setEasingCurve(FluentTransition.EASE_SPRING)
+            size_animation.setStartValue(old_size)
+            size_animation.setEndValue(new_size)
+            size_animation.finished.connect(
+                lambda: self.setFixedSize(new_size))
+            size_animation.start()
+
     def avatarSize(self) -> Size:
         """Get avatar size"""
         return self._size
 
-    # 基类方法保持不变，不覆盖
     def size(self) -> QSize:
-        """返回组件大小"""
+        """Get widget size"""
         return super().size()
 
     def setShape(self, shape: Shape):
-        """Set avatar shape"""
-        self._shape = shape
-        self.update()
+        """Set avatar shape with transition"""
+        if self._shape != shape:
+            self._shape = shape
+            # Add subtle transition effect
+            FluentMicroInteraction.pulse_animation(self, 1.05)
 
     def shape(self) -> Shape:
         """Get avatar shape"""
         return self._shape
 
     def setPixmap(self, pixmap: QPixmap):
-        """Set avatar photo"""
+        """Set avatar photo with transition"""
         self._pixmap = pixmap
         self._style = self.Style.PHOTO
-        self.update()
+
+        # Add reveal transition
+        FluentRevealEffect.fade_in(self, 300)
 
     def pixmap(self) -> Optional[QPixmap]:
         """Get avatar photo"""
         return self._pixmap
 
     def setInitials(self, initials: str):
-        """Set avatar initials"""
-        self._initials = initials.upper()[:2]  # Max 2 characters
-        self._style = self.Style.INITIALS
-        self.update()
+        """Set avatar initials with transition"""
+        new_initials = initials.upper()[:2]
+        if self._initials != new_initials:
+            self._initials = new_initials
+            self._style = self.Style.INITIALS
+
+            # Add transition effect
+            FluentMicroInteraction.pulse_animation(self, 1.03)
 
     def initials(self) -> str:
         """Get avatar initials"""
         return self._initials
 
     def setName(self, name: str):
-        """Set name and auto-generate initials"""
-        self._name = name
+        """Set name and auto-generate initials with transition"""
+        if self._name != name:
+            self._name = name
 
-        # Auto-generate initials
-        if name:
-            parts = name.strip().split()
-            if len(parts) >= 2:
-                self._initials = (parts[0][0] + parts[-1][0]).upper()
-            elif len(parts) == 1:
-                self._initials = parts[0][:2].upper()
+            # Auto-generate initials
+            if name:
+                parts = name.strip().split()
+                if len(parts) >= 2:
+                    self._initials = (parts[0][0] + parts[-1][0]).upper()
+                elif len(parts) == 1:
+                    self._initials = parts[0][:2].upper()
+                else:
+                    self._initials = ""
+
+                self._style = self.Style.INITIALS
             else:
                 self._initials = ""
+                self._style = self.Style.PLACEHOLDER
 
-            self._style = self.Style.INITIALS
-        else:
-            self._initials = ""
-            self._style = self.Style.PLACEHOLDER
-
-        self.update()
+            # Add transition effect
+            FluentMicroInteraction.pulse_animation(self, 1.03)
 
     def name(self) -> str:
         """Get name"""
         return self._name
 
     def setIcon(self, icon: str):
-        """Set avatar icon"""
-        self._icon = icon
-        self._style = self.Style.ICON
-        self.update()
+        """Set avatar icon with transition"""
+        if self._icon != icon:
+            self._icon = icon
+            self._style = self.Style.ICON
+
+            # Add transition effect
+            FluentMicroInteraction.pulse_animation(self, 1.03)
 
     def icon(self) -> str:
         """Get avatar icon"""
@@ -363,75 +491,103 @@ class FluentAvatar(QWidget):
         return self._clickable
 
     def setBorderWidth(self, width: int):
-        """Set border width"""
-        self._border_width = max(0, width)
-        self.update()
+        """Set border width with transition"""
+        new_width = max(0, width)
+        if self._border_width != new_width:
+            self._border_width = new_width
+            FluentMicroInteraction.pulse_animation(self, 1.02)
 
     def borderWidth(self) -> int:
         """Get border width"""
         return self._border_width
 
     def setBorderColor(self, color: QColor):
-        """Set border color"""
+        """Set border color with transition"""
         self._border_color = color
         self._setup_style()
+        FluentMicroInteraction.pulse_animation(self, 1.02)
 
     def borderColor(self) -> QColor:
         """Get border color"""
         return self._border_color if self._border_color else self._border_col
 
     def setBackgroundColor(self, color: QColor):
-        """Set background color"""
+        """Set background color with transition"""
         self._background_color = color
         self._setup_style()
+        FluentMicroInteraction.pulse_animation(self, 1.02)
 
     def backgroundColor(self) -> QColor:
         """Get background color"""
         return self._background_color if self._background_color else self._bg_color
 
-    def enterEvent(self, event):
-        """Handle mouse enter"""
+    # Enhanced event handlers
+    def enterEvent(self, event: QEnterEvent):
+        """Handle mouse enter with enhanced animation"""
         if self._clickable:
+            # Enhanced hover animation
             self._hover_animation.setStartValue(self._hover_progress)
             self._hover_animation.setEndValue(1.0)
             self._hover_animation.start()
+
+            # Subtle scale effect
+            self._scale_animation.setStartValue(self._scale_progress)
+            self._scale_animation.setEndValue(1.05)
+            self._scale_animation.start()
+
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Handle mouse leave"""
+        """Handle mouse leave with enhanced animation"""
         if self._clickable:
+            # Return to normal state
             self._hover_animation.setStartValue(self._hover_progress)
             self._hover_animation.setEndValue(0.0)
             self._hover_animation.start()
+
+            # Return to normal scale
+            self._scale_animation.setStartValue(self._scale_progress)
+            self._scale_animation.setEndValue(1.0)
+            self._scale_animation.start()
+
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
-        """Handle mouse press"""
+        """Handle mouse press with enhanced animation"""
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
+            # Enhanced press animation
             self._press_animation.setStartValue(self._press_progress)
             self._press_animation.setEndValue(1.0)
             self._press_animation.start()
+
+            # Scale down effect
+            FluentMicroInteraction.button_press(self, 0.95)
+
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """Handle mouse release"""
+        """Handle mouse release with enhanced animation"""
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
+            # Release animation
             self._press_animation.setStartValue(self._press_progress)
             self._press_animation.setEndValue(0.0)
             self._press_animation.start()
 
             if self.rect().contains(event.position().toPoint()):
-                self.clicked.emit()
+                # Add ripple effect before emitting signal
+                FluentMicroInteraction.ripple_effect(self)
+                QTimer.singleShot(100, self.clicked.emit)
 
         super().mouseReleaseEvent(event)
 
     def _on_theme_changed(self, _):
-        """Handle theme change"""
+        """Handle theme change with transition"""
         self._setup_style()
+        FluentMicroInteraction.pulse_animation(self, 1.02)
 
 
 class FluentAvatarGroup(QWidget):
-    """Group of avatars with overflow handling"""
+    """Group of avatars with overflow handling and enhanced animations"""
 
     def __init__(self, max_visible: int = 5, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -444,77 +600,119 @@ class FluentAvatarGroup(QWidget):
 
         self._setup_ui()
         self._setup_style()
+        self._setup_enhanced_animations()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_ui(self):
-        """Setup UI"""
+        """Setup UI components"""
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(0)  # We'll handle spacing manually
+        self._layout.setSpacing(0)  # Handle spacing manually
 
         self._update_layout()
 
     def _setup_style(self):
-        """Setup style"""
-        style_sheet = f"""
-            FluentAvatarGroup {{
+        """Setup component style"""
+        self.setStyleSheet("""
+            FluentAvatarGroup {
                 background-color: transparent;
-            }}
-        """
+            }
+        """)
 
-        self.setStyleSheet(style_sheet)
+    def _setup_enhanced_animations(self):
+        """Setup enhanced animation system"""
+        # Entrance animation for the group
+        QTimer.singleShot(100, self._show_group_entrance)
+
+    def _show_group_entrance(self):
+        """Show group entrance with staggered animation"""
+        if self._avatars:
+            FluentRevealEffect.staggered_reveal(list(self._avatars), 150)
 
     def addAvatar(self, avatar: FluentAvatar):
-        """Add avatar to group"""
+        """Add avatar to group with animation"""
         avatar.setSize(self._size)
         self._avatars.append(avatar)
-        self._update_layout()
+
+        # Add entrance animation for new avatar
+        avatar.setParent(self)
+        FluentRevealEffect.scale_in(avatar, 300)
+
+        QTimer.singleShot(350, self._update_layout)
 
     def removeAvatar(self, avatar: FluentAvatar):
-        """Remove avatar from group"""
+        """Remove avatar from group with animation"""
         if avatar in self._avatars:
-            self._avatars.remove(avatar)
-            avatar.setParent(None)
-            self._update_layout()
+            # Animate removal
+            exit_sequence = FluentSequence(self)
+            exit_sequence.addCallback(
+                lambda: FluentMicroInteraction.scale_animation(avatar, 0.0))
+            exit_sequence.addPause(200)
+            exit_sequence.addCallback(lambda: self._complete_removal(avatar))
+            exit_sequence.start()
+
+    def _complete_removal(self, avatar: FluentAvatar):
+        """Complete avatar removal"""
+        self._avatars.remove(avatar)
+        avatar.setParent(None)
+        self._update_layout()
 
     def clear(self):
-        """Clear all avatars"""
+        """Clear all avatars with animation"""
+        if self._avatars:
+            # Animate all avatars out
+            for i, avatar in enumerate(self._avatars):
+                QTimer.singleShot(
+                    i * 100, lambda a=avatar: FluentMicroInteraction.scale_animation(a, 0.0))
+
+            # Clear after animations
+            QTimer.singleShot(len(self._avatars) * 100 +
+                              300, self._complete_clear)
+
+    def _complete_clear(self):
+        """Complete clearing all avatars"""
         for avatar in self._avatars:
             avatar.setParent(None)
         self._avatars.clear()
         self._update_layout()
 
     def setMaxVisible(self, max_visible: int):
-        """Set maximum visible avatars"""
-        self._max_visible = max(1, max_visible)
-        self._update_layout()
+        """Set maximum visible avatars with transition"""
+        new_max = max(1, max_visible)
+        if self._max_visible != new_max:
+            self._max_visible = new_max
+            self._update_layout_animated()
 
     def maxVisible(self) -> int:
         """Get maximum visible avatars"""
         return self._max_visible
 
     def setSize(self, size: FluentAvatar.Size):
-        """Set avatar size"""
-        self._size = size
-        for avatar in self._avatars:
-            avatar.setSize(size)
-        self._update_layout()
+        """Set avatar size with transition"""
+        if self._size != size:
+            self._size = size
 
-    # 修复：重命名方法或修改返回类型
+            # Animate size change for all avatars
+            for avatar in self._avatars:
+                avatar.setSize(size)
+
+            QTimer.singleShot(200, self._update_layout)
+
     def avatarSize(self) -> FluentAvatar.Size:
         """Get avatar size"""
         return self._size
 
-    # 不覆盖基类的 size() 方法
     def size(self) -> QSize:
-        """返回组件大小"""
+        """Get widget size"""
         return super().size()
 
     def setOverlap(self, overlap: int):
-        """Set avatar overlap"""
-        self._overlap = max(0, overlap)
-        self._update_layout()
+        """Set avatar overlap with transition"""
+        new_overlap = max(0, overlap)
+        if self._overlap != new_overlap:
+            self._overlap = new_overlap
+            self._update_layout_animated()
 
     def overlap(self) -> int:
         """Get avatar overlap"""
@@ -533,7 +731,7 @@ class FluentAvatarGroup(QWidget):
         visible_count = min(len(self._avatars), self._max_visible)
         overflow_count = max(0, len(self._avatars) - self._max_visible)
 
-        # Add visible avatars
+        # Add visible avatars with enhanced positioning
         for i in range(visible_count):
             avatar = self._avatars[i]
             avatar.setParent(self)
@@ -555,9 +753,18 @@ class FluentAvatarGroup(QWidget):
                 self._layout.addSpacing(-self._overlap)
             self._layout.addWidget(overflow_avatar)
 
+            # Add entrance animation for overflow indicator
+            FluentRevealEffect.scale_in(overflow_avatar, 200)
+
         self._layout.addStretch()
 
+    def _update_layout_animated(self):
+        """Update layout with animation"""
+        # Add transition effect
+        FluentMicroInteraction.pulse_animation(self, 1.02)
+        QTimer.singleShot(150, self._update_layout)
+
     def _on_theme_changed(self, _):
-        """Handle theme change"""
+        """Handle theme change with transition"""
         self._setup_style()
-        self._update_layout()
+        self._update_layout_animated()

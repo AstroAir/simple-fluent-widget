@@ -12,17 +12,17 @@ from typing import Optional, Union
 
 
 class FluentLabel(QLabel):
-    """Fluent Design Style基础标签
+    """Fluent Design Style base label
 
     Features:
-    - 支持多种文本样式（标题、正文、说明文字等）
-    - 主题自适应颜色
-    - 动画效果支持
-    - 可与其他组件组合使用
+    - Supports multiple text styles (title, body, caption, etc.)
+    - Theme-adaptive colors
+    - Animation support
+    - Can be combined with other components
     """
 
     class LabelStyle:
-        """标签样式枚举"""
+        """Label style enum"""
         BODY = "body"
         CAPTION = "caption"
         SUBTITLE = "subtitle"
@@ -31,7 +31,7 @@ class FluentLabel(QLabel):
         DISPLAY = "display"
 
     class LabelType:
-        """标签类型枚举"""
+        """Label type enum"""
         PRIMARY = "primary"
         SECONDARY = "secondary"
         DISABLED = "disabled"
@@ -57,17 +57,17 @@ class FluentLabel(QLabel):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def set_style(self, style: str):
-        """设置标签样式"""
+        """Set label style"""
         self._label_style = style
         self._apply_style()
 
     def set_type(self, label_type: str):
-        """设置标签类型"""
+        """Set label type"""
         self._label_type = label_type
         self._apply_style()
 
     def set_clickable(self, clickable: bool):
-        """设置是否可点击"""
+        """Set whether the label is clickable"""
         self._is_clickable = clickable
         if clickable:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -77,10 +77,10 @@ class FluentLabel(QLabel):
             self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def _apply_style(self):
-        """应用标签样式"""
+        """Apply label style"""
         theme = theme_manager
 
-        # 设置字体
+        # Set font
         font = QFont()
         if self._label_style == self.LabelStyle.BODY:
             font.setPointSize(14)
@@ -103,7 +103,7 @@ class FluentLabel(QLabel):
 
         self.setFont(font)
 
-        # 设置颜色
+        # Set color
         color = theme.get_color('text_primary')
         if self._label_type == self.LabelType.SECONDARY:
             color = theme.get_color('text_secondary')
@@ -137,24 +137,24 @@ class FluentLabel(QLabel):
         self.setStyleSheet(style_sheet)
 
     def mousePressEvent(self, event):
-        """鼠标按下事件"""
+        """Mouse press event"""
         if self._is_clickable:
             self.clicked.emit()
         super().mousePressEvent(event)
 
     def enterEvent(self, event):
-        """悬停进入事件"""
+        """Hover enter event"""
         if self._is_clickable and self._animation_helper:
             self._animation_helper.add_hover_effect()
         super().enterEvent(event)
 
-    def _on_theme_changed(self, theme_name: str):  # noqa: ARG002
-        """主题变化处理"""
+    def _on_theme_changed(self, _):  # noqa: ARG002
+        """Theme change handler"""
         self._apply_style()
 
 
 class FluentIconLabel(QWidget):
-    """带图标的标签组件"""
+    """Label component with an icon"""
 
     clicked = Signal()
 
@@ -172,7 +172,7 @@ class FluentIconLabel(QWidget):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_ui(self, text: str, icon: Optional[Union[QIcon, QPixmap, str]], icon_size: int):
-        """设置UI布局"""
+        """Set up UI layout"""
         if self._layout_direction == "horizontal":
             layout = QHBoxLayout(self)
         else:
@@ -181,7 +181,7 @@ class FluentIconLabel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        # 创建图标标签
+        # Create icon label
         if icon:
             self.icon_label = QLabel()
             self.icon_label.setFixedSize(icon_size, icon_size)
@@ -200,7 +200,7 @@ class FluentIconLabel(QWidget):
         else:
             self.icon_label = None
 
-        # 创建文字标签
+        # Create text label
         self.text_label = FluentLabel(text)
         layout.addWidget(self.text_label)
 
@@ -208,15 +208,15 @@ class FluentIconLabel(QWidget):
             layout.addStretch()
 
     def set_text(self, text: str):
-        """设置文字"""
+        """Set text"""
         self.text_label.setText(text)
 
     def text(self) -> str:
-        """获取文字"""
+        """Get text"""
         return self.text_label.text()
 
     def set_clickable(self, clickable: bool):
-        """设置是否可点击"""
+        """Set whether the label is clickable"""
         self._is_clickable = clickable
         self.text_label.set_clickable(clickable)
         if clickable:
@@ -225,15 +225,15 @@ class FluentIconLabel(QWidget):
             self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def set_text_style(self, style: str):
-        """设置文字样式"""
+        """Set text style"""
         self.text_label.set_style(style)
 
     def set_text_type(self, label_type: str):
-        """设置文字类型"""
+        """Set text type"""
         self.text_label.set_type(label_type)
 
     def _apply_style(self):
-        """应用样式"""
+        """Apply style"""
         self.setStyleSheet("""
             FluentIconLabel {
                 background: transparent;
@@ -242,21 +242,21 @@ class FluentIconLabel(QWidget):
         """)
 
     def mousePressEvent(self, event):
-        """鼠标按下事件"""
+        """Mouse press event"""
         if self._is_clickable:
             self.clicked.emit()
         super().mousePressEvent(event)
 
-    def _on_theme_changed(self, theme_name: str):  # noqa: ARG002
-        """主题变化处理"""
+    def _on_theme_changed(self, _):  # noqa: ARG002
+        """Theme change handler"""
         self._apply_style()
 
 
 class FluentStatusLabel(QWidget):
-    """状态标签组件"""
+    """Status label component"""
 
     class StatusType:
-        """状态类型"""
+        """Status type"""
         SUCCESS = "success"
         WARNING = "warning"
         ERROR = "error"
@@ -276,12 +276,12 @@ class FluentStatusLabel(QWidget):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_ui(self, text: str):
-        """设置UI"""
+        """Set up UI"""
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(6)
 
-        # 状态指示器
+        # Status indicator
         if self._show_indicator:
             self.indicator = QLabel()
             self.indicator.setFixedSize(8, 8)
@@ -289,19 +289,19 @@ class FluentStatusLabel(QWidget):
         else:
             self.indicator = None
 
-        # 文字标签
+        # Text label
         self.text_label = FluentLabel(text, style=FluentLabel.LabelStyle.BODY)
         layout.addWidget(self.text_label)
 
         layout.addStretch()
 
     def set_status(self, status: str):
-        """设置状态"""
+        """Set status"""
         self._status = status
         self._apply_style()
 
     def set_text(self, text: str):
-        """设置文字"""
+        """Set text"""
         self.text_label.setText(text)
 
     def text(self) -> str:
@@ -309,10 +309,10 @@ class FluentStatusLabel(QWidget):
         return self.text_label.text()
 
     def _apply_style(self):
-        """应用样式"""
+        """Apply style"""
         theme = theme_manager
 
-        # 设置状态颜色
+        # Set status color
         if self._status == self.StatusType.SUCCESS:
             status_color = QColor("#107c10")
             text_type = FluentLabel.LabelType.SUCCESS
@@ -329,7 +329,7 @@ class FluentStatusLabel(QWidget):
             status_color = theme.get_color('text_secondary')
             text_type = FluentLabel.LabelType.SECONDARY
 
-        # 设置指示器样式
+        # Set indicator style
         if self.indicator:
             self.indicator.setStyleSheet(f"""
                 QLabel {{
@@ -338,10 +338,10 @@ class FluentStatusLabel(QWidget):
                 }}
             """)
 
-        # 设置文字类型
+        # Set text type
         self.text_label.set_type(text_type)
 
-        # 设置整体样式
+        # Set overall style
         self.setStyleSheet(f"""
             FluentStatusLabel {{
                 background-color: {status_color.name()}15;
@@ -350,13 +350,13 @@ class FluentStatusLabel(QWidget):
             }}
         """)
 
-    def _on_theme_changed(self, theme_name: str):  # noqa: ARG002
-        """主题变化处理"""
+    def _on_theme_changed(self, _):  # noqa: ARG002
+        """Theme change handler"""
         self._apply_style()
 
 
 class FluentLinkLabel(FluentLabel):
-    """链接标签组件"""
+    """Link label component"""
 
     def __init__(self, text: str = "", url: str = "", parent: Optional[QWidget] = None):
         super().__init__(text, parent, style=FluentLabel.LabelStyle.BODY,
@@ -369,7 +369,7 @@ class FluentLinkLabel(FluentLabel):
         self.clicked.connect(self._on_link_clicked)
 
     def _setup_link_style(self):
-        """设置链接样式"""
+        """Set link style"""
         theme = theme_manager
         primary_color = theme.get_color('primary')
         hover_color = primary_color.lighter(120)
@@ -386,27 +386,27 @@ class FluentLinkLabel(FluentLabel):
         self.setStyleSheet(style_sheet)
 
     def set_url(self, url: str):
-        """设置链接URL"""
+        """Set link URL"""
         self._url = url
 
     def get_url(self) -> str:
-        """获取链接URL"""
+        """Get link URL"""
         return self._url
 
     def _on_link_clicked(self):
-        """链接点击处理"""
+        """Link click handler"""
         if self._url:
             import webbrowser
             webbrowser.open(self._url)
 
-    def _on_theme_changed(self, theme_name: str):  # noqa: ARG002
-        """主题变化处理"""
-        super()._on_theme_changed(theme_name)
+    def _on_theme_changed(self, _):  # noqa: ARG002
+        """Theme change handler"""
+        super()._on_theme_changed(_)
         self._setup_link_style()
 
 
 class FluentLabelGroup(QWidget):
-    """标签组组件"""
+    """Label group component"""
 
     def __init__(self, parent: Optional[QWidget] = None,
                  layout_direction: str = "horizontal", spacing: int = 12):
@@ -418,7 +418,7 @@ class FluentLabelGroup(QWidget):
         self._setup_ui(spacing)
 
     def _setup_ui(self, spacing: int):
-        """设置UI"""
+        """Set up UI"""
         if self._layout_direction == "horizontal":
             self._layout = QHBoxLayout(self)
         else:
@@ -429,7 +429,7 @@ class FluentLabelGroup(QWidget):
         self._layout.addStretch()
 
     def add_label(self, label: Union[FluentLabel, FluentIconLabel, FluentStatusLabel, str]) -> QWidget:
-        """添加标签"""
+        """Add label"""
         if isinstance(label, str):
             label_widget = FluentLabel(label)
         else:
@@ -441,7 +441,7 @@ class FluentLabelGroup(QWidget):
         return label_widget
 
     def remove_label(self, label: Union[QWidget, int]):
-        """移除标签"""
+        """Remove label"""
         if isinstance(label, int):
             if 0 <= label < len(self._labels):
                 label_widget = self._labels.pop(label)
@@ -454,14 +454,14 @@ class FluentLabelGroup(QWidget):
                 label.setParent(None)
 
     def clear_labels(self):
-        """清空所有标签"""
+        """Clear all labels"""
         for label in self._labels[:]:
             self.remove_label(label)
 
     def get_labels(self):
-        """获取所有标签"""
+        """Get all labels"""
         return self._labels.copy()
 
     def set_spacing(self, spacing: int):
-        """设置间距"""
+        """Set spacing"""
         self._layout.setSpacing(spacing)

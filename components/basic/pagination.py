@@ -12,28 +12,31 @@ from PySide6.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel,
 from PySide6.QtCore import Qt, Signal
 
 from core.theme import theme_manager
+from core.enhanced_animations import FluentRevealEffect, FluentMicroInteraction, FluentTransition
+from core.animation import FluentAnimation
 
 
 class FluentPagination(QWidget):
     """
-    现代分页组件
+    Modern pagination component
 
     Features:
-    - 多种显示模式（简单、完整、紧凑）
-    - 每页大小选择
-    - 跳转到指定页面
-    - 自定义页面范围显示
-    - 响应式按钮状态
+    - Multiple display modes (simple, full, compact)
+    - Page size selection
+    - Jump to specific page
+    - Custom page range display
+    - Responsive button states
+    - Enhanced animations
     """
 
-    # 信号
-    page_changed = Signal(int)  # 页面变化
-    page_size_changed = Signal(int)  # 每页大小变化
+    # Signals
+    page_changed = Signal(int)  # Page change signal
+    page_size_changed = Signal(int)  # Page size change signal
 
-    # 显示模式
-    MODE_SIMPLE = "simple"      # 简单模式：上一页/下一页
-    MODE_FULL = "full"          # 完整模式：包含页码按钮
-    MODE_COMPACT = "compact"    # 紧凑模式：只显示核心控件
+    # Display modes
+    MODE_SIMPLE = "simple"      # Simple mode: prev/next only
+    MODE_FULL = "full"          # Full mode: includes page buttons
+    MODE_COMPACT = "compact"    # Compact mode: core controls only
 
     def __init__(self,
                  total: int = 0,
@@ -61,20 +64,20 @@ class FluentPagination(QWidget):
         self._update_state()
 
     def _setup_ui(self):
-        """设置UI"""
+        """Setup UI"""
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(8)
 
-        # 总数显示
+        # Total count display
         if self._show_total:
             self._total_label = QLabel()
             self._layout.addWidget(self._total_label)
             self._layout.addStretch()
 
-        # 每页大小选择
+        # Page size selection
         if self._show_page_size:
-            self._page_size_label = QLabel("每页")
+            self._page_size_label = QLabel("Items per page")
             self._page_size_combo = QComboBox()
             self._page_size_combo.setFixedWidth(80)
 
@@ -85,80 +88,109 @@ class FluentPagination(QWidget):
             self._page_size_combo.currentTextChanged.connect(
                 self._on_page_size_changed)
 
-            self._page_size_unit_label = QLabel("条")
-
             self._layout.addWidget(self._page_size_label)
             self._layout.addWidget(self._page_size_combo)
-            self._layout.addWidget(self._page_size_unit_label)
 
-        # 分页控件容器
+        # Pagination controls container
         self._pagination_container = QWidget()
         self._pagination_layout = QHBoxLayout(self._pagination_container)
         self._pagination_layout.setContentsMargins(0, 0, 0, 0)
         self._pagination_layout.setSpacing(4)
 
-        # 上一页按钮
+        # Previous page button
         self._prev_button = QPushButton("‹")
         self._prev_button.setFixedSize(32, 32)
         self._prev_button.clicked.connect(self._go_prev_page)
+        self._prev_button.setToolTip("Previous page")
+
+        # Add hover animation to prev button
+        self._prev_button.enterEvent = lambda event: self._on_button_hover(
+            self._prev_button)
+        self._prev_button.leaveEvent = lambda event: self._on_button_leave(
+            self._prev_button)
+
         self._pagination_layout.addWidget(self._prev_button)
 
-        # 页码按钮容器
+        # Page buttons container
         self._page_buttons_container = QWidget()
         self._page_buttons_layout = QHBoxLayout(self._page_buttons_container)
         self._page_buttons_layout.setContentsMargins(0, 0, 0, 0)
         self._page_buttons_layout.setSpacing(2)
         self._pagination_layout.addWidget(self._page_buttons_container)
 
-        # 下一页按钮
+        # Next page button
         self._next_button = QPushButton("›")
         self._next_button.setFixedSize(32, 32)
         self._next_button.clicked.connect(self._go_next_page)
+        self._next_button.setToolTip("Next page")
+
+        # Add hover animation to next button
+        self._next_button.enterEvent = lambda event: self._on_button_hover(
+            self._next_button)
+        self._next_button.leaveEvent = lambda event: self._on_button_leave(
+            self._next_button)
+
         self._pagination_layout.addWidget(self._next_button)
 
         self._layout.addWidget(self._pagination_container)
 
-        # 跳转控件
+        # Jump controls
         if self._show_jumper:
-            self._jumper_label = QLabel("跳至")
+            self._jumper_label = QLabel("Go to page")
             self._jumper_spinbox = QSpinBox()
             self._jumper_spinbox.setFixedWidth(60)
             self._jumper_spinbox.setMinimum(1)
             self._jumper_spinbox.valueChanged.connect(self._on_jumper_changed)
-            self._jumper_unit_label = QLabel("页")
 
             self._layout.addWidget(self._jumper_label)
             self._layout.addWidget(self._jumper_spinbox)
-            self._layout.addWidget(self._jumper_unit_label)
+
+    def _on_button_hover(self, button: QPushButton):
+        """Handle button hover with micro-interaction"""
+        if button.isEnabled():
+            FluentMicroInteraction.hover_glow(button, intensity=0.1)
+
+    def _on_button_leave(self, button: QPushButton):
+        """Handle button leave"""
+        # Reset to normal state - could add fade out animation here
+        pass
+
+    def _on_button_click(self, button: QPushButton):
+        """Handle button click with micro-interaction"""
+        if button.isEnabled():
+            FluentMicroInteraction.button_press(button, scale=0.95)
 
     def _connect_theme(self):
-        """连接主题"""
+        """Connect to theme"""
         if theme_manager:
             theme_manager.theme_changed.connect(self._update_style)
         self._update_style()
 
     def _update_style(self):
-        """更新样式"""
+        """Update styles"""
         if not theme_manager:
             return
         theme = theme_manager
 
-        # 按钮基础样式
+        # Base button styles
         button_style = f"""
             QPushButton {{
                 background-color: {theme.get_color("background").name()};
                 color: {theme.get_color("on_surface").name()};
                 border: 1px solid {theme.get_color("border").name()};
-                border-radius: 4px;
+                border-radius: 6px;
                 font-size: 14px;
                 font-weight: 500;
+                transition: all 0.2s ease;
             }}
             QPushButton:hover {{
                 background-color: {theme.get_color("primary").lighter(130).name()};
                 border-color: {theme.get_color("primary").name()};
+                transform: translateY(-1px);
             }}
             QPushButton:pressed {{
                 background-color: {theme.get_color("primary").darker(110).name()};
+                transform: translateY(0px);
             }}
             QPushButton:disabled {{
                 background-color: {theme.get_color("surface_variant").name()};
@@ -167,15 +199,16 @@ class FluentPagination(QWidget):
             }}
         """
 
-        # 应用样式到导航按钮
+        # Apply styles to navigation buttons
         self._prev_button.setStyleSheet(button_style)
         self._next_button.setStyleSheet(button_style)
 
-        # 标签样式
+        # Label styles
         label_style = f"""
             QLabel {{
                 color: {theme.get_color("on_surface").name()};
                 font-size: 13px;
+                font-weight: 400;
             }}
         """
 
@@ -183,26 +216,30 @@ class FluentPagination(QWidget):
             self._total_label.setStyleSheet(label_style)
         if hasattr(self, '_page_size_label'):
             self._page_size_label.setStyleSheet(label_style)
-            self._page_size_unit_label.setStyleSheet(label_style)
         if hasattr(self, '_jumper_label'):
             self._jumper_label.setStyleSheet(label_style)
-            self._jumper_unit_label.setStyleSheet(label_style)
 
-        # 下拉框和输入框样式
+        # Input controls styles
         input_style = f"""
             QComboBox, QSpinBox {{
                 background-color: {theme.get_color("background").name()};
                 color: {theme.get_color("on_surface").name()};
                 border: 1px solid {theme.get_color("border").name()};
-                border-radius: 4px;
+                border-radius: 6px;
                 padding: 4px 8px;
                 font-size: 13px;
+                transition: border-color 0.2s ease;
             }}
             QComboBox:hover, QSpinBox:hover {{
                 border-color: {theme.get_color("primary").name()};
             }}
+            QComboBox:focus, QSpinBox:focus {{
+                border-color: {theme.get_color("primary").name()};
+                outline: none;
+            }}
             QComboBox::drop-down {{
                 border: none;
+                border-radius: 0 6px 6px 0;
             }}
             QComboBox::down-arrow {{
                 width: 12px;
@@ -215,11 +252,11 @@ class FluentPagination(QWidget):
         if hasattr(self, '_jumper_spinbox'):
             self._jumper_spinbox.setStyleSheet(input_style)
 
-        self._update_page_buttons()  # Styles for page buttons depend on theme
+        self._update_page_buttons()
 
     def _update_page_buttons(self):
-        """更新页码按钮"""
-        # 清除现有按钮
+        """Update page buttons with enhanced animations"""
+        # Clear existing buttons
         for i in reversed(range(self._page_buttons_layout.count())):
             item = self._page_buttons_layout.itemAt(i)
             if item:
@@ -232,10 +269,9 @@ class FluentPagination(QWidget):
             return
 
         total_pages = self.get_total_pages()
-        # Ensure at least one page button if mode is full and total_pages is 1
         if total_pages <= 1 and self._mode != self.MODE_FULL:
             if self._mode == self.MODE_FULL and total_pages == 1:
-                pass  # allow to create page 1 button
+                pass
             else:
                 self._page_buttons_container.setVisible(False)
                 return
@@ -247,7 +283,10 @@ class FluentPagination(QWidget):
             return
         theme = theme_manager
 
-        for page_num_or_ellipsis in page_range:
+        # Create buttons with staggered reveal animation
+        buttons_to_animate = []
+
+        for index, page_num_or_ellipsis in enumerate(page_range):
             if page_num_or_ellipsis == "...":
                 ellipsis_label = QLabel("...")
                 ellipsis_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -255,12 +294,20 @@ class FluentPagination(QWidget):
                 ellipsis_label.setStyleSheet(
                     f"color: {theme.get_color('on_surface').name()}; font-size: 14px;")
                 self._page_buttons_layout.addWidget(ellipsis_label)
+                buttons_to_animate.append(ellipsis_label)
             else:
                 page_num = int(page_num_or_ellipsis)
                 page_button = QPushButton(str(page_num))
                 page_button.setFixedSize(32, 32)
                 page_button.clicked.connect(
-                    lambda _checked, p=page_num: self.set_current_page(p))
+                    lambda _checked, p=page_num: self._on_page_button_clicked(p))
+                page_button.setToolTip(f"Go to page {page_num}")
+
+                # Add hover and click animations
+                page_button.enterEvent = lambda event, btn=page_button: self._on_button_hover(
+                    btn)
+                page_button.leaveEvent = lambda event, btn=page_button: self._on_button_leave(
+                    btn)
 
                 if page_num == self._current_page:
                     page_button.setStyleSheet(f"""
@@ -268,9 +315,15 @@ class FluentPagination(QWidget):
                             background-color: {theme.get_color("primary").name()};
                             color: {theme.get_color("on_primary").name()};
                             border: 1px solid {theme.get_color("primary").name()};
-                            border-radius: 4px;
+                            border-radius: 6px;
                             font-size: 14px;
                             font-weight: 600;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        }}
+                        QPushButton:hover {{
+                            background-color: {theme.get_color("primary").darker(110).name()};
+                            transform: translateY(-1px);
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
                         }}
                     """)
                 else:
@@ -279,22 +332,50 @@ class FluentPagination(QWidget):
                             background-color: {theme.get_color("background").name()};
                             color: {theme.get_color("on_surface").name()};
                             border: 1px solid {theme.get_color("border").name()};
-                            border-radius: 4px;
+                            border-radius: 6px;
                             font-size: 14px;
                             font-weight: 500;
+                            transition: all 0.2s ease;
                         }}
                         QPushButton:hover {{
                             background-color: {theme.get_color("primary").lighter(130).name()};
                             border-color: {theme.get_color("primary").name()};
+                            transform: translateY(-1px);
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                         }}
                         QPushButton:pressed {{
                             background-color: {theme.get_color("primary").darker(110).name()};
+                            transform: translateY(0px);
                         }}
                     """)
+
                 self._page_buttons_layout.addWidget(page_button)
+                buttons_to_animate.append(page_button)
+
+        # Apply staggered reveal animation to new buttons
+        if buttons_to_animate:
+            FluentRevealEffect.staggered_reveal(
+                buttons_to_animate, stagger_delay=50)
+
+    def _on_page_button_clicked(self, page_num: int):
+        """Handle page button click with animation"""
+        # Find the clicked button and add press animation
+        for i in range(self._page_buttons_layout.count()):
+            item = self._page_buttons_layout.itemAt(i)
+            if item:
+                widget_candidate = item.widget()  # Get the widget once
+                # Check if widget_candidate is an instance of QPushButton
+                if isinstance(widget_candidate, QPushButton):
+                    # Now, widget_candidate is known to be a QPushButton.
+                    button = widget_candidate  # Assign to 'button'
+                    if button.text() == str(page_num):
+                        self._on_button_click(button)
+                        break
+
+        self.set_current_page(page_num)
 
     def _calculate_page_range(self, total_pages: int) -> list:
-        """计算要显示的页码范围"""
+        """Calculate page range to display"""
         if total_pages <= 0:
             return []
         if total_pages <= 7:
@@ -316,10 +397,8 @@ class FluentPagination(QWidget):
 
         if current <= 4:
             start_middle = 2
-            # Show 1, 2, 3, 4, 5, ..., total
             end_middle = min(total_pages - 1, 5)
         elif current >= total_pages - 3:
-            # Show 1, ..., N-4, N-3, N-2, N-1, N
             start_middle = max(2, total_pages - 4)
             end_middle = total_pages - 1
 
@@ -329,7 +408,6 @@ class FluentPagination(QWidget):
 
         # Ellipsis before last page
         if current < total_pages - 3 and end_middle < total_pages - 1:
-            # avoid double ellipsis
             if "..." not in page_range[len(page_range)-2:]:
                 page_range.append("...")
 
@@ -337,7 +415,7 @@ class FluentPagination(QWidget):
         if total_pages > 1 and total_pages not in page_range:
             page_range.append(total_pages)
 
-        # Remove duplicate "..." if any, or leading/trailing "..." if not needed
+        # Clean up duplicates and unnecessary ellipsis
         final_range = []
         last_is_ellipsis = False
         for item in page_range:
@@ -349,7 +427,7 @@ class FluentPagination(QWidget):
                 final_range.append(item)
                 last_is_ellipsis = False
 
-        # Ensure ellipsis makes sense (e.g., not 1, ..., 2)
+        # Remove unnecessary ellipsis
         i = 0
         while i < len(final_range) - 1:
             if final_range[i] == "..." and isinstance(final_range[i+1], int) and isinstance(final_range[i-1], int):
@@ -358,13 +436,12 @@ class FluentPagination(QWidget):
                     continue
             i += 1
 
-        # Ensure first element is 1 if total_pages > 0
+        # Ensure proper structure
         if total_pages > 0 and (not final_range or final_range[0] != 1):
             if 1 in final_range:
-                final_range.remove(1)  # remove if misplaced
+                final_range.remove(1)
             final_range.insert(0, 1)
 
-        # Ensure last element is total_pages if total_pages > 1
         if total_pages > 1:
             if final_range[-1] != total_pages:
                 if total_pages in final_range:
@@ -374,126 +451,151 @@ class FluentPagination(QWidget):
                 else:
                     final_range.append(total_pages)
 
-        # Deduplicate final_range while preserving order
+        # Final deduplication
         seen = set()
         deduped_final_range = []
         for item in final_range:
-            if item == "...":  # Allow multiple distinct ellipsis
+            if item == "...":
                 if not deduped_final_range or deduped_final_range[-1] != "...":
                     deduped_final_range.append(item)
             elif item not in seen:
                 seen.add(item)
                 deduped_final_range.append(item)
 
-        # Final check for consecutive numbers around ellipsis
-        i = 1
-        while i < len(deduped_final_range) - 1:
-            if deduped_final_range[i] == "..." and \
-               isinstance(deduped_final_range[i-1], int) and \
-               isinstance(deduped_final_range[i+1], int) and \
-               deduped_final_range[i+1] == deduped_final_range[i-1] + 1:
-                deduped_final_range.pop(i)  # Remove redundant ellipsis
-            else:
-                i += 1
-
-        # Ensure no "..." if all pages can be shown
         if total_pages <= 7:
             return list(range(1, total_pages + 1))
 
         return deduped_final_range
 
     def _update_state(self):
-        """更新状态"""
+        """Update state with smooth transitions"""
         total_pages = self.get_total_pages()
 
-        # 更新按钮状态
-        self._prev_button.setEnabled(self._current_page > 1)
-        self._next_button.setEnabled(
-            self._current_page < total_pages or total_pages == 0 and self._current_page == 1)
+        # Update button states with smooth transitions
+        prev_enabled = self._current_page > 1
+        next_enabled = self._current_page < total_pages or (
+            total_pages == 0 and self._current_page == 1)
 
-        # 更新总数显示
+        # Animate button state changes
+        if self._prev_button.isEnabled() != prev_enabled:
+            self._prev_button.setEnabled(prev_enabled)
+            if prev_enabled:
+                FluentRevealEffect.fade_in(
+                    self._prev_button, duration=FluentAnimation.DURATION_FAST)
+
+        if self._next_button.isEnabled() != next_enabled:
+            self._next_button.setEnabled(next_enabled)
+            if next_enabled:
+                FluentRevealEffect.fade_in(
+                    self._next_button, duration=FluentAnimation.DURATION_FAST)
+
+        # Update total display
         if hasattr(self, '_total_label'):
             if self._total == 0:
-                self._total_label.setText("共 0 条")
+                new_text = "No items"
             else:
                 start_item = (self._current_page - 1) * self._page_size + 1
                 end_item = min(self._current_page *
                                self._page_size, self._total)
-                self._total_label.setText(
-                    f"共 {self._total} 条，第 {start_item}-{end_item} 条")
+                new_text = f"Showing {start_item}-{end_item} of {self._total} items"
 
-        # 更新跳转器范围
+            if self._total_label.text() != new_text:
+                self._total_label.setText(new_text)
+                FluentRevealEffect.fade_in(
+                    self._total_label, duration=FluentAnimation.DURATION_FAST)
+
+        # Update jumper range
         if hasattr(self, '_jumper_spinbox'):
             self._jumper_spinbox.setMaximum(max(1, total_pages))
-            if self._total == 0:  # If no items, jumper should be 1 and disabled or hidden
+            if self._total == 0:
                 self._jumper_spinbox.setValue(1)
                 self._jumper_spinbox.setEnabled(False)
             else:
                 self._jumper_spinbox.setValue(self._current_page)
                 self._jumper_spinbox.setEnabled(True)
 
-        # 更新页码按钮
+        # Update page buttons
         self._update_page_buttons()
         self._update_visibility()
 
     def _update_visibility(self):
-        """更新控件的可见性"""
+        """Update control visibility with animations"""
         is_simple_mode = self._mode == self.MODE_SIMPLE
         has_items = self._total > 0
         total_pages = self.get_total_pages()
 
+        # Animate visibility changes
         if hasattr(self, '_total_label'):
-            self._total_label.setVisible(
-                self._show_total and not is_simple_mode)
-        if hasattr(self, '_page_size_label'):
-            self._page_size_label.setVisible(
-                self._show_page_size and not is_simple_mode and has_items)
-            self._page_size_combo.setVisible(
-                self._show_page_size and not is_simple_mode and has_items)
-            self._page_size_unit_label.setVisible(
-                self._show_page_size and not is_simple_mode and has_items)
+            should_show = self._show_total and not is_simple_mode
+            if self._total_label.isVisible() != should_show:
+                if should_show:
+                    self._total_label.setVisible(True)
+                    FluentRevealEffect.slide_in(
+                        self._total_label, direction="left")
+                else:
+                    self._total_label.setVisible(False)
 
-        self._pagination_container.setVisible(not is_simple_mode and (
-            has_items or total_pages > 0))  # Show if items or if explicitly set to show page 1 of 0
+        if hasattr(self, '_page_size_label'):
+            should_show = self._show_page_size and not is_simple_mode and has_items
+            if self._page_size_label.isVisible() != should_show:
+                if should_show:
+                    self._page_size_label.setVisible(True)
+                    self._page_size_combo.setVisible(True)
+                    FluentRevealEffect.slide_in(
+                        self._page_size_label, direction="right")
+                    FluentRevealEffect.slide_in(
+                        self._page_size_combo, direction="right")
+                else:
+                    self._page_size_label.setVisible(False)
+                    self._page_size_combo.setVisible(False)
+
+        should_show_pagination = not is_simple_mode and (
+            has_items or total_pages > 0)
+        if self._pagination_container.isVisible() != should_show_pagination:
+            if should_show_pagination:
+                self._pagination_container.setVisible(True)
+                FluentRevealEffect.scale_in(self._pagination_container)
+            else:
+                self._pagination_container.setVisible(False)
 
         if hasattr(self, '_jumper_label'):
-            self._jumper_label.setVisible(
-                self._show_jumper and not is_simple_mode and has_items)
-            self._jumper_spinbox.setVisible(
-                self._show_jumper and not is_simple_mode and has_items)
-            self._jumper_unit_label.setVisible(
-                self._show_jumper and not is_simple_mode and has_items)
+            should_show = self._show_jumper and not is_simple_mode and has_items
+            if self._jumper_label.isVisible() != should_show:
+                if should_show:
+                    self._jumper_label.setVisible(True)
+                    self._jumper_spinbox.setVisible(True)
+                    FluentRevealEffect.slide_in(
+                        self._jumper_label, direction="right")
+                    FluentRevealEffect.slide_in(
+                        self._jumper_spinbox, direction="right")
+                else:
+                    self._jumper_label.setVisible(False)
+                    self._jumper_spinbox.setVisible(False)
 
-        # Hide page buttons container if no pages to show or in simple mode
+        # Page buttons container visibility
         if is_simple_mode or (total_pages == 0 and self._mode != self.MODE_FULL) or (total_pages == 1 and self._mode == self.MODE_COMPACT):
             self._page_buttons_container.setVisible(False)
-        # Special case: show page 1 for 0 items in full mode
         elif self._mode == self.MODE_FULL and total_pages == 0:
             self._page_buttons_container.setVisible(True)
         else:
             self._page_buttons_container.setVisible(True)
 
     def _on_page_size_changed(self, text: str):
-        """页面大小改变"""
+        """Handle page size change"""
         try:
             new_size = int(text)
             if new_size <= 0:
-                return  # Page size must be positive
+                return
 
             if new_size != self._page_size:
                 old_page_size = self._page_size
                 self._page_size = new_size
 
-                # 调整当前页面以保持数据位置的近似
-                # Calculate the first item index on the current page with the old page size
+                # Adjust current page to maintain data position
                 first_item_on_current_page_old = (
                     self._current_page - 1) * old_page_size + 1
-
-                # Calculate the new current page based on the new page size
-                # to keep the first_item_on_current_page_old visible
                 new_current_page = math.ceil(
                     first_item_on_current_page_old / self._page_size)
-                # Ensure page is at least 1
                 new_current_page = max(1, new_current_page)
 
                 total_pages = self.get_total_pages()
@@ -502,58 +604,56 @@ class FluentPagination(QWidget):
 
                 self._update_state()
                 self.page_size_changed.emit(new_size)
-                # Emit page_changed only if the current page actually changed after adjustment
-                # check also if new_current_page was 0
                 if self._current_page != new_current_page and not (self._current_page == 1 and new_current_page == 0):
                     self.page_changed.emit(self._current_page)
 
         except ValueError:
-            # Restore previous value if input is invalid
             if hasattr(self, '_page_size_combo'):
                 self._page_size_combo.setCurrentText(str(self._page_size))
 
     def _on_jumper_changed(self, page: int):
-        """跳转页面改变"""
+        """Handle jumper page change"""
         if page != self._current_page and page >= 1:
             total_pages = self.get_total_pages()
-            if page <= total_pages or total_pages == 0 and page == 1:
+            if page <= total_pages or (total_pages == 0 and page == 1):
                 self.set_current_page(page)
 
     def _go_prev_page(self):
-        """上一页"""
+        """Go to previous page with animation"""
         if self._current_page > 1:
+            self._on_button_click(self._prev_button)
             self.set_current_page(self._current_page - 1)
 
     def _go_next_page(self):
-        """下一页"""
+        """Go to next page with animation"""
         if self._current_page < self.get_total_pages():
+            self._on_button_click(self._next_button)
             self.set_current_page(self._current_page + 1)
 
     def get_total_pages(self) -> int:
-        """获取总页数"""
+        """Get total pages"""
         if self._total == 0:
-            return 0  # Or 1 if you want to show page 1 of 0
+            return 0
         if self._page_size <= 0:
-            return 1  # Should not happen if validated
+            return 1
         return max(1, math.ceil(self._total / self._page_size))
 
     def set_total(self, total: int):
-        """设置总条数"""
+        """Set total items"""
         self._total = max(0, total)
 
         total_pages = self.get_total_pages()
         if self._current_page > total_pages and total_pages > 0:
             self._current_page = total_pages
-        elif total_pages == 0:  # if total items become 0
-            self._current_page = 1  # Reset to page 1
+        elif total_pages == 0:
+            self._current_page = 1
 
         self._update_state()
 
     def set_current_page(self, page: int):
-        """设置当前页面"""
+        """Set current page with smooth transition"""
         total_pages = self.get_total_pages()
 
-        # If no items, current page should be 1
         if total_pages == 0:
             new_page = 1
         else:
@@ -563,21 +663,19 @@ class FluentPagination(QWidget):
             self._current_page = new_page
             self._update_state()
             self.page_changed.emit(new_page)
-        # Even if page number is same, state might need update (e.g. jumper sync)
         else:
             self._update_state()
 
     def set_page_size(self, size: int):
-        """设置每页大小"""
+        """Set page size"""
         if size <= 0:
-            return  # Page size must be positive
+            return
 
         if size != self._page_size:
             old_page_size = self._page_size
             self._page_size = size
 
             if hasattr(self, '_page_size_combo'):
-                # Check if the size is in options, if not, add it or handle
                 found = False
                 for i in range(self._page_size_combo.count()):
                     if self._page_size_combo.itemData(i) == size:
@@ -585,10 +683,6 @@ class FluentPagination(QWidget):
                         found = True
                         break
                 if not found:
-                    # Optionally add the new size to combo if not present
-                    # self._page_size_combo.addItem(str(size), size)
-                    # self._page_size_combo.setCurrentText(str(size))
-                    # Or just update text if it's meant to be an editable combo
                     self._page_size_combo.setCurrentText(str(size))
 
             first_item_on_current_page_old = (
@@ -603,32 +697,29 @@ class FluentPagination(QWidget):
 
             self._update_state()
             self.page_size_changed.emit(size)
-            # Emit page_changed only if the current page actually changed after adjustment
-            # if self._current_page != current_page_before_resize:
-            #    self.page_changed.emit(self._current_page)
 
     def get_current_page(self) -> int:
-        """获取当前页面"""
+        """Get current page"""
         return self._current_page
 
     def get_page_size(self) -> int:
-        """获取每页大小"""
+        """Get page size"""
         return self._page_size
 
     def get_total(self) -> int:
-        """获取总条数"""
+        """Get total items"""
         return self._total
 
     def set_mode(self, mode: str):
-        """设置显示模式"""
+        """Set display mode"""
         if mode in [self.MODE_SIMPLE, self.MODE_FULL, self.MODE_COMPACT]:
             self._mode = mode
-            self._update_state()  # Full update to re-evaluate visibility and buttons
+            self._update_state()
 
 
 class FluentSimplePagination(QWidget):
     """
-    简化版分页组件，只包含基本的上一页/下一页功能
+    Simplified pagination component with basic prev/next functionality
     """
 
     page_changed = Signal(int)
@@ -649,36 +740,61 @@ class FluentSimplePagination(QWidget):
         self._update_state()
 
     def _setup_ui(self):
-        """设置UI"""
+        """Setup UI"""
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        # 上一页按钮
-        self._prev_button = QPushButton("上一页")
+        # Previous button
+        self._prev_button = QPushButton("Previous")
         self._prev_button.setFixedHeight(32)
         self._prev_button.clicked.connect(self._go_prev_page)
+        self._prev_button.setToolTip("Go to previous page")
+
+        # Add hover animations
+        self._prev_button.enterEvent = lambda event: self._on_button_hover(
+            self._prev_button)
+        self._prev_button.leaveEvent = lambda event: self._on_button_leave(
+            self._prev_button)
+
         layout.addWidget(self._prev_button)
 
-        # 页面信息
+        # Page info
         self._page_label = QLabel()
         self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._page_label)
 
-        # 下一页按钮
-        self._next_button = QPushButton("下一页")
+        # Next button
+        self._next_button = QPushButton("Next")
         self._next_button.setFixedHeight(32)
         self._next_button.clicked.connect(self._go_next_page)
+        self._next_button.setToolTip("Go to next page")
+
+        # Add hover animations
+        self._next_button.enterEvent = lambda event: self._on_button_hover(
+            self._next_button)
+        self._next_button.leaveEvent = lambda event: self._on_button_leave(
+            self._next_button)
+
         layout.addWidget(self._next_button)
 
+    def _on_button_hover(self, button: QPushButton):
+        """Handle button hover with micro-interaction"""
+        if button.isEnabled():
+            FluentMicroInteraction.hover_glow(button, intensity=0.1)
+
+    def _on_button_leave(self, button: QPushButton):
+        """Handle button leave"""
+        pass
+
     def _connect_theme(self):
-        """连接主题"""
+        """Connect to theme"""
         if theme_manager:
             theme_manager.theme_changed.connect(self._update_style)
         self._update_style()
 
     def _update_style(self):
-        """更新样式"""
+        """Update styles"""
         if not theme_manager:
             return
         theme = theme_manager
@@ -688,17 +804,21 @@ class FluentSimplePagination(QWidget):
                 background-color: {theme.get_color("background").name()};
                 color: {theme.get_color("on_surface").name()};
                 border: 1px solid {theme.get_color("border").name()};
-                border-radius: 4px;
-                padding: 6px 12px;
+                border-radius: 6px;
+                padding: 6px 16px;
                 font-size: 13px;
                 font-weight: 500;
+                transition: all 0.2s ease;
             }}
             QPushButton:hover:enabled {{
                 background-color: {theme.get_color("primary").lighter(130).name()};
                 border-color: {theme.get_color("primary").name()};
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }}
             QPushButton:pressed:enabled {{
                 background-color: {theme.get_color("primary").darker(110).name()};
+                transform: translateY(0px);
             }}
             QPushButton:disabled {{
                 background-color: {theme.get_color("surface_variant").name()};
@@ -714,37 +834,54 @@ class FluentSimplePagination(QWidget):
             QLabel {{
                 color: {theme.get_color("on_surface").name()};
                 font-size: 13px;
-                padding: 0 12px;
+                font-weight: 500;
+                padding: 0 16px;
             }}
         """)
 
     def _update_state(self):
-        """更新状态"""
-        self._prev_button.setEnabled(self._has_prev)
-        self._next_button.setEnabled(self._has_next)
-        self._page_label.setText(f"第 {self._current_page} 页")
+        """Update state with smooth transitions"""
+        # Animate button state changes
+        if self._prev_button.isEnabled() != self._has_prev:
+            self._prev_button.setEnabled(self._has_prev)
+            if self._has_prev:
+                FluentRevealEffect.fade_in(
+                    self._prev_button, duration=FluentAnimation.DURATION_FAST)
+
+        if self._next_button.isEnabled() != self._has_next:
+            self._next_button.setEnabled(self._has_next)
+            if self._has_next:
+                FluentRevealEffect.fade_in(
+                    self._next_button, duration=FluentAnimation.DURATION_FAST)
+
+        # Update page label with animation
+        new_text = f"Page {self._current_page}"
+        if self._page_label.text() != new_text:
+            self._page_label.setText(new_text)
+            FluentRevealEffect.fade_in(
+                self._page_label, duration=FluentAnimation.DURATION_FAST)
 
     def _go_prev_page(self):
-        """上一页"""
+        """Go to previous page with animation"""
         if self._has_prev:
+            FluentMicroInteraction.button_press(self._prev_button, scale=0.95)
             self._current_page -= 1
             self.page_changed.emit(self._current_page)
-            # Assuming external logic will call set_page_info to update has_prev/has_next
 
     def _go_next_page(self):
-        """下一页"""
+        """Go to next page with animation"""
         if self._has_next:
+            FluentMicroInteraction.button_press(self._next_button, scale=0.95)
             self._current_page += 1
             self.page_changed.emit(self._current_page)
-            # Assuming external logic will call set_page_info to update has_prev/has_next
 
     def set_page_info(self, current_page: int, has_prev: bool, has_next: bool):
-        """设置页面信息"""
+        """Set page information with smooth transitions"""
         self._current_page = current_page
         self._has_prev = has_prev
         self._has_next = has_next
         self._update_state()
 
     def get_current_page(self) -> int:
-        """获取当前页面"""
+        """Get current page"""
         return self._current_page

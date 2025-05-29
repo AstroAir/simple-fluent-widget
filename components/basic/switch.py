@@ -261,9 +261,12 @@ class FluentSwitch(QWidget):
             super().keyPressEvent(event)
 
     def paintEvent(self, _event):  # Parameter event is not used
-        """绘制事件"""
+        """Paint event"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Reference the event parameter to avoid warning
+        _ = _event
 
         if not theme_manager:
             return
@@ -314,17 +317,17 @@ class FluentSwitch(QWidget):
                 if not self._checked:  # Only lighten thumb if it's not the white one
                     current_thumb_color = current_thumb_color.lighter(105)
 
-        # 绘制轨道
+        # Draw track
         track_rect = self._get_track_rect()
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(current_track_color))
         painter.drawRoundedRect(
             track_rect, track_rect.height() // 2, track_rect.height() // 2)
 
-        # 绘制滑块
+        # Draw thumb
         thumb_rect = self._get_thumb_rect()
 
-        # 滑块阴影 (Only if enabled and theme is light, or a subtle shadow always)
+        # Thumb shadow (Only if enabled and theme is light, or a subtle shadow always)
         if self._enabled:  # Simple shadow for enabled state
             shadow_rect = thumb_rect.adjusted(1, 1, 1, 1)
             shadow_color = theme_manager.get_color(
@@ -334,11 +337,11 @@ class FluentSwitch(QWidget):
             painter.setBrush(QBrush(shadow_color))
             painter.drawEllipse(shadow_rect)
 
-        # 滑块主体
+        # Thumb body
         painter.setBrush(QBrush(current_thumb_color))
         painter.drawEllipse(thumb_rect)
 
-        # 绘制文本
+        # Draw text
         if self._text:
             config = self._size_configs[self._size]
             font = QFont()
@@ -353,7 +356,7 @@ class FluentSwitch(QWidget):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft |
                              Qt.AlignmentFlag.AlignVCenter, self._text)
 
-        # 绘制开关文本
+        # Draw switch text
         if self._on_text or self._off_text:
             config = self._size_configs[self._size]
             font = QFont()

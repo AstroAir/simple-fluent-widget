@@ -4,11 +4,12 @@ Visual timeline for displaying chronological events and processes
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QFrame, QScrollArea, QSizePolicy)
-from PySide6.QtCore import Qt, Signal, QDateTime, QPropertyAnimation, Property, QByteArray
+                               QFrame, QScrollArea, QSizePolicy, QGraphicsOpacityEffect)
+from PySide6.QtCore import Qt, Signal, QDateTime, QPropertyAnimation, Property, QByteArray, QAbstractAnimation
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from core.theme import theme_manager
 from core.animation import FluentAnimation
+from core.enhanced_animations import FluentRevealEffect, FluentMicroInteraction, FluentTransition, FluentParallel
 from typing import Optional, List, Union, cast
 from enum import Enum
 from datetime import datetime
@@ -26,7 +27,7 @@ class FluentTimelineItem(QFrame):
 
     # Signals
     clicked = Signal()
-    hover_progress_changed = Signal()
+    pulse_progress_changed = Signal()
 
     def __init__(self, title: str = "", description: str = "",
                  timestamp: Optional[Union[datetime, QDateTime]] = None,
@@ -41,8 +42,14 @@ class FluentTimelineItem(QFrame):
         self._clickable = False
         self._dot_size = 12
         self._line_width = 2
-        self._content_widget: Optional[QWidget] = None
-        self._hover_progress = 0.0
+        self._content_widget_internal: Optional[QWidget] = None
+        self._pulse_progress = 0.0
+
+        self._title_label: Optional[QLabel] = None
+        self._desc_label: Optional[QLabel] = None
+        self._timestamp_label: Optional[QLabel] = None
+        self._dot_container: Optional[QFrame] = None
+        self._pulse_animation: Optional[QPropertyAnimation] = None
 
         self._setup_ui()
         self._setup_style()
@@ -51,28 +58,27 @@ class FluentTimelineItem(QFrame):
         if theme_manager:
             theme_manager.theme_changed.connect(self._on_theme_changed)
 
+        FluentRevealEffect.fade_in(
+            self, duration=FluentAnimation.DURATION_MEDIUM)
+
     def _setup_ui(self):
         """Setup UI"""
         self.setFrameStyle(QFrame.Shape.NoFrame)
 
-        # Main layout
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(16)
 
-        # Timeline dot container
         self._dot_container = QFrame()
         self._dot_container.setFixedWidth(self._dot_size + 8)
         self._dot_container.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
 
-        # Content container
         content_frame = QFrame()
         content_layout = QVBoxLayout(content_frame)
         content_layout.setContentsMargins(0, 0, 0, 16)
         content_layout.setSpacing(4)
 
-        # Header (title and timestamp)
         if self._title or self._timestamp:
             header_layout = QHBoxLayout()
             header_layout.setContentsMargins(0, 0, 0, 0)
@@ -98,7 +104,6 @@ class FluentTimelineItem(QFrame):
 
             content_layout.addLayout(header_layout)
 
-        # Description
         if self._description:
             self._desc_label = QLabel(self._description)
             self._desc_label.setWordWrap(True)
@@ -116,26 +121,23 @@ class FluentTimelineItem(QFrame):
             return
         theme = theme_manager
 
-        # Dot container style
-        self._dot_container.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border: none;
-            }
-        """)
+        if self._dot_container:
+            self._dot_container.setStyleSheet("""
+                QFrame {
+                    background-color: transparent;
+                    border: none;
+                }
+            """)
 
-        # Title style
-        if hasattr(self, '_title_label'):
+        if self._title_label:
             title_color = theme.get_color('text_primary')
             self._title_label.setStyleSheet(f"color: {title_color.name()};")
 
-        # Description style
-        if hasattr(self, '_desc_label'):
+        if self._desc_label:
             desc_color = theme.get_color('text_secondary')
             self._desc_label.setStyleSheet(f"color: {desc_color.name()};")
 
-        # Timestamp style
-        if hasattr(self, '_timestamp_label'):
+        if self._timestamp_label:
             timestamp_color = theme.get_color('text_tertiary')
             self._timestamp_label.setStyleSheet(
                 f"color: {timestamp_color.name()};")
@@ -144,71 +146,54 @@ class FluentTimelineItem(QFrame):
 
     def _setup_animations(self):
         """Setup animations"""
-        self._hover_animation = QPropertyAnimation(
-            self, QByteArray(b"hover_progress"))
-        self._hover_animation.setDuration(FluentAnimation.DURATION_FAST)
-        self._hover_animation.setEasingCurve(FluentAnimation.EASE_OUT)
+        self._pulse_animation = QPropertyAnimation(
+            self, QByteArray(b"pulse_progress"))
+        self._pulse_animation.setDuration(FluentAnimation.DURATION_FAST)
+        self._pulse_animation.setEasingCurve(FluentAnimation.EASE_OUT)
 
     def paintEvent(self, event):
         """Custom paint event for timeline dot and line"""
         super().paintEvent(event)
-
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
         self._draw_timeline_elements(painter)
 
     def _draw_timeline_elements(self, painter: QPainter):
         """Draw timeline dot and connecting line"""
-        if not theme_manager:
+        if not theme_manager or not self._dot_container:
             return
         theme = theme_manager
-
-        # Get dot container geometry
         dot_rect = self._dot_container.geometry()
         dot_center_x = dot_rect.center().x()
         dot_center_y = dot_rect.top() + self._dot_size // 2 + 8
-
-        # Get status color
         dot_color = self._get_status_color()
-
-        # Draw connecting line (if not first item)
         line_color = theme.get_color('border')
         painter.setPen(QPen(line_color, self._line_width))
-
-        # Line from top to dot
         if dot_center_y > self._dot_size:
             painter.drawLine(dot_center_x, 0, dot_center_x,
                              dot_center_y - self._dot_size // 2)
-
-        # Line from dot to bottom
         painter.drawLine(dot_center_x, dot_center_y + self._dot_size // 2,
                          dot_center_x, self.height())
-
-        # Draw status dot
         self._draw_status_dot(painter, dot_center_x, dot_center_y, dot_color)
 
     def _draw_status_dot(self, painter: QPainter, x: int, y: int, color: QColor):
         """Draw status dot"""
-        # Outer ring
         ring_color = color.lighter(120)
         painter.setPen(QPen(ring_color, 2))
         painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
         painter.drawEllipse(x - self._dot_size // 2, y - self._dot_size // 2,
                             self._dot_size, self._dot_size)
-
-        # Inner dot
         inner_size = self._dot_size - 4
         painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.setBrush(QBrush(color))
         painter.drawEllipse(x - inner_size // 2, y - inner_size // 2,
                             inner_size, inner_size)
-
-        # Add pulsing effect for current status
-        if self._status == self.Status.CURRENT:
-            pulse_size = self._dot_size + int(4 * self._hover_progress)
+        if self._status == self.Status.CURRENT and self._pulse_animation and \
+           self._pulse_animation.state() == QPropertyAnimation.State.Running:
+            pulse_factor = self._pulse_progress
+            pulse_size = self._dot_size + int(4 * pulse_factor)
             pulse_color = QColor(color)
-            pulse_color.setAlpha(int(50 * (1 - self._hover_progress)))
+            pulse_color.setAlpha(int(50 * (1 - pulse_factor)))
             painter.setBrush(QBrush(pulse_color))
             painter.drawEllipse(x - pulse_size // 2, y - pulse_size // 2,
                                 pulse_size, pulse_size)
@@ -216,9 +201,8 @@ class FluentTimelineItem(QFrame):
     def _get_status_color(self) -> QColor:
         """Get color based on status"""
         if not theme_manager:
-            return QColor(Qt.GlobalColor.gray)  # Fallback color
+            return QColor(Qt.GlobalColor.gray)
         theme = theme_manager
-
         status_colors = {
             self.Status.PENDING: theme.get_color('text_tertiary'),
             self.Status.CURRENT: theme.get_color('primary'),
@@ -226,7 +210,6 @@ class FluentTimelineItem(QFrame):
             self.Status.ERROR: theme.get_color('error'),
             self.Status.WARNING: theme.get_color('warning')
         }
-
         return status_colors.get(self._status, theme.get_color('text_tertiary'))
 
     def _format_timestamp(self, timestamp_input: Union[datetime, QDateTime]) -> str:
@@ -237,38 +220,36 @@ class FluentTimelineItem(QFrame):
         elif isinstance(timestamp_input, datetime):
             py_timestamp = timestamp_input
         else:
-            return "Invalid date"  # Should not happen with type hints
-
+            return "Invalid date"
         now = datetime.now()
         diff = now - py_timestamp
-
         if diff.days > 0:
-            return f"{diff.days}天前"
-        elif diff.seconds > 3600:
+            return f"{diff.days} days ago" if diff.days > 1 else "1 day ago"
+        elif diff.seconds >= 3600:
             hours = diff.seconds // 3600
-            return f"{hours}小时前"
-        elif diff.seconds > 60:
+            return f"{hours} hours ago" if hours > 1 else "1 hour ago"
+        elif diff.seconds >= 60:
             minutes = diff.seconds // 60
-            return f"{minutes}分钟前"
+            return f"{minutes} minutes ago" if minutes > 1 else "1 minute ago"
         else:
-            return "刚刚"
+            return "just now"
 
-    def _get_hover_progress(self) -> float:
-        return self._hover_progress
+    def _get_pulse_progress(self) -> float:
+        return self._pulse_progress
 
-    def _set_hover_progress(self, value: float):
-        if self._hover_progress != value:
-            self._hover_progress = value
-            self.hover_progress_changed.emit()
+    def _set_pulse_progress(self, value: float):
+        if self._pulse_progress != value:
+            self._pulse_progress = value
+            self.pulse_progress_changed.emit()
             self.update()
 
-    hover_progress = Property(float, _get_hover_progress,
-                              _set_hover_progress, None, "", notify=hover_progress_changed)
+    pulse_progress = Property(float, _get_pulse_progress,
+                              _set_pulse_progress, None, "", notify=pulse_progress_changed)
 
     def setTitle(self, title: str):
         """Set item title"""
         self._title = title
-        if hasattr(self, '_title_label'):
+        if self._title_label:
             self._title_label.setText(title)
 
     def title(self) -> str:
@@ -278,7 +259,7 @@ class FluentTimelineItem(QFrame):
     def setDescription(self, description: str):
         """Set item description"""
         self._description = description
-        if hasattr(self, '_desc_label'):
+        if self._desc_label:
             self._desc_label.setText(description)
 
     def description(self) -> str:
@@ -288,8 +269,9 @@ class FluentTimelineItem(QFrame):
     def setTimestamp(self, timestamp: Union[datetime, QDateTime]):
         """Set item timestamp"""
         self._timestamp = timestamp
-        if hasattr(self, '_timestamp_label'):
-            self._timestamp_label.setText(self._format_timestamp(timestamp))
+        if self._timestamp_label and self._timestamp:
+            self._timestamp_label.setText(
+                self._format_timestamp(self._timestamp))
 
     def timestamp(self) -> Optional[Union[datetime, QDateTime]]:
         """Get item timestamp"""
@@ -297,12 +279,17 @@ class FluentTimelineItem(QFrame):
 
     def setStatus(self, status: Status):
         """Set item status"""
+        if self._status == status and self._status == self.Status.CURRENT and \
+           self._pulse_animation and self._pulse_animation.state() == QPropertyAnimation.State.Running:
+            return
         self._status = status
         self.update()
-
-        # Start pulsing animation for current status
-        if status == self.Status.CURRENT:
-            self._start_pulse_animation()
+        if self._pulse_animation:
+            if status == self.Status.CURRENT:
+                self._start_pulse_animation()
+            else:
+                self._pulse_animation.stop()
+                self._set_pulse_progress(0.0)
 
     def status(self) -> Status:
         """Get item status"""
@@ -310,30 +297,33 @@ class FluentTimelineItem(QFrame):
 
     def setContentWidget(self, widget: QWidget):
         """Set custom content widget"""
-        if self._content_widget:
-            self._content_widget.setParent(None)
-            self._content_widget.deleteLater()  # Ensure proper cleanup
-
-        self._content_widget = widget
+        if self._content_widget_internal:
+            FluentRevealEffect.fade_out(
+                self._content_widget_internal, duration=FluentAnimation.DURATION_FAST, delete_when_stopped=False)  # type: ignore
+            self._content_widget_internal.setParent(None)
+            self._content_widget_internal.deleteLater()
+        self._content_widget_internal = widget
         if widget:
-            # Find content layout and add widget
             current_layout = self.layout()
             if current_layout and current_layout.count() > 1:
                 content_item = current_layout.itemAt(1)
-                if content_item:
+                if content_item and content_item.widget():
                     content_frame = content_item.widget()
                     if content_frame:
                         content_frame_layout = content_frame.layout()
                         if content_frame_layout:
                             content_frame_layout.addWidget(widget)
+                            FluentRevealEffect.fade_in(
+                                widget, duration=FluentAnimation.DURATION_MEDIUM)
                         else:
-                            # If content_frame has no layout, create one
                             new_content_layout = QVBoxLayout(content_frame)
                             new_content_layout.addWidget(widget)
+                            FluentRevealEffect.fade_in(
+                                widget, duration=FluentAnimation.DURATION_MEDIUM)
 
     def contentWidget(self) -> Optional[QWidget]:
         """Get content widget"""
-        return self._content_widget
+        return self._content_widget_internal
 
     def setClickable(self, clickable: bool):
         """Set whether item is clickable"""
@@ -347,40 +337,46 @@ class FluentTimelineItem(QFrame):
 
     def _start_pulse_animation(self):
         """Start pulsing animation for current items"""
-        self._hover_animation.setStartValue(0.0)
-        self._hover_animation.setEndValue(1.0)
-        self._hover_animation.setDuration(1000)
-        self._hover_animation.setLoopCount(-1)  # Infinite loop
-        self._hover_animation.start()
+        if self._pulse_animation:
+            if self._pulse_animation.state() == QPropertyAnimation.State.Running:
+                self._pulse_animation.stop()
+            self._pulse_animation.setStartValue(0.0)
+            self._pulse_animation.setEndValue(1.0)
+            self._pulse_animation.setDuration(1000)
+            self._pulse_animation.setLoopCount(-1)
+            self._pulse_animation.start()
 
     def mousePressEvent(self, event):
         """Handle mouse press"""
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
+            FluentMicroInteraction.button_press(self, scale=0.98)
             self.clicked.emit()
         super().mousePressEvent(event)
 
-    def _on_theme_changed(self, _=None):  # Add default for signal argument
+    def _on_theme_changed(self, _=None):
         """Handle theme change"""
         self._setup_style()
+        FluentRevealEffect.fade_in(
+            self, duration=FluentAnimation.DURATION_FAST)
 
 
 class FluentTimeline(QScrollArea):
     """Fluent Design timeline widget"""
 
-    # Signals
-    item_clicked = Signal(int)  # item index
+    item_clicked = Signal(int)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-
         self._items: List[FluentTimelineItem] = []
         self._reverse_order = False
-
+        self._content_widget_internal: Optional[QWidget] = None
+        self._layout_internal: Optional[QVBoxLayout] = None
         self._setup_ui()
         self._setup_style()
-
         if theme_manager:
             theme_manager.theme_changed.connect(self._on_theme_changed)
+        FluentRevealEffect.fade_in(
+            self, duration=FluentAnimation.DURATION_MEDIUM)
 
     def _setup_ui(self):
         """Setup UI"""
@@ -388,31 +384,25 @@ class FluentTimeline(QScrollArea):
         self.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-
-        # Content widget
-        self._content_widget = QWidget()
-        self._layout = QVBoxLayout(self._content_widget)
-        self._layout.setContentsMargins(16, 16, 16, 16)
-        self._layout.setSpacing(0)
-
-        # Add stretch at the end
-        self._layout.addStretch()
-
-        self.setWidget(self._content_widget)
+        self._content_widget_internal = QWidget()
+        self._layout_internal = QVBoxLayout(self._content_widget_internal)
+        self._layout_internal.setContentsMargins(16, 16, 16, 16)
+        self._layout_internal.setSpacing(0)
+        self._layout_internal.addStretch()
+        self.setWidget(self._content_widget_internal)
 
     def _setup_style(self):
         """Setup style"""
         if not theme_manager:
             return
         theme = theme_manager
-
         style_sheet = f"""
-            QScrollArea {{
+            FluentTimeline {{
                 background-color: {theme.get_color('background').name()};
                 border: 1px solid {theme.get_color('border').name()};
                 border-radius: 8px;
             }}
-            QScrollArea > QWidget {{ /* Target the viewport's child */
+            FluentTimeline > QWidget > QWidget {{
                 background-color: transparent;
             }}
             QScrollBar:vertical {{
@@ -420,18 +410,18 @@ class FluentTimeline(QScrollArea):
                 border: none;
                 border-radius: 6px;
                 width: 12px;
-                margin: 0px 0px 0px 0px; /* Adjusted margins */
+                margin: 1px 1px 1px 1px;
             }}
             QScrollBar::handle:vertical {{
                 background: {theme.get_color('border').name()};
-                border-radius: 6px;
+                border-radius: 5px;
                 min-height: 20px;
             }}
             QScrollBar::handle:vertical:hover {{
                 background: {theme.get_color('text_secondary').name()};
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                height: 0px; /* Remove arrows */
+                height: 0px; 
                 border: none;
                 background: none;
             }}
@@ -442,63 +432,79 @@ class FluentTimeline(QScrollArea):
                 background: none;
             }}
         """
-
+        self.setObjectName("FluentTimeline")
         self.setStyleSheet(style_sheet)
-        if self._content_widget:  # Ensure content widget also gets transparent background
-            self._content_widget.setStyleSheet(
+        if self._content_widget_internal:
+            self._content_widget_internal.setStyleSheet(
                 "background-color: transparent;")
 
     def addItem(self, title: str = "", description: str = "",
                 timestamp: Optional[Union[datetime, QDateTime]] = None,
                 status: FluentTimelineItem.Status = FluentTimelineItem.Status.PENDING) -> int:
-        """Add timeline item
-
-        Returns:
-            Index of added item
-        """
+        """Add timeline item"""
+        if not self._layout_internal or not self._content_widget_internal:
+            return -1
         item = FluentTimelineItem(
-            title, description, timestamp, status, self)  # Parent to self for QScrollArea
-
-        # Connect signals
-        # Ensure lambda captures current length for correct index
-        # current_item_count = len(self._items) # Unused variable
+            title, description, timestamp, status, self._content_widget_internal)
         item.clicked.connect(
             lambda item_ref=item: self._on_item_clicked_ref(item_ref))
-
-        # Insert item based on order
         if self._reverse_order:
-            self._layout.insertWidget(0, item)
+            self._layout_internal.insertWidget(0, item)
             self._items.insert(0, item)
         else:
-            # Insert before stretch
-            self._layout.insertWidget(len(self._items), item)
+            self._layout_internal.insertWidget(len(self._items), item)
             self._items.append(item)
-
+        FluentRevealEffect.slide_in(
+            item, duration=FluentAnimation.DURATION_MEDIUM, direction="down")
         return self._items.index(item)
 
     def insertItem(self, index: int, title: str = "", description: str = "",
                    timestamp: Optional[Union[datetime, QDateTime]] = None,
                    status: FluentTimelineItem.Status = FluentTimelineItem.Status.PENDING):
         """Insert item at index"""
-        if not 0 <= index <= len(self._items):
-            return  # Or raise IndexError
-
-        item = FluentTimelineItem(title, description, timestamp, status, self)
+        if not (0 <= index <= len(self._items) and self._layout_internal and self._content_widget_internal):
+            return
+        item = FluentTimelineItem(
+            title, description, timestamp, status, self._content_widget_internal)
         item.clicked.connect(
             lambda item_ref=item: self._on_item_clicked_ref(item_ref))
-
-        self._layout.insertWidget(index, item)
+        self._layout_internal.insertWidget(index, item)
         self._items.insert(index, item)
+        FluentRevealEffect.slide_in(
+            item, duration=FluentAnimation.DURATION_MEDIUM, direction="down")
 
     def removeItem(self, index: int):
         """Remove item at index"""
-        if not 0 <= index < len(self._items):
+        if not (0 <= index < len(self._items) and self._layout_internal and self._content_widget_internal):
             return
+        item_widget_to_remove = self._items[index]
+        group_anim = FluentParallel(item_widget_to_remove)
+        fade_anim = FluentTransition._create_fade_transition(
+            item_widget_to_remove, FluentAnimation.DURATION_FAST, FluentTransition.EASE_SMOOTH)
+        current_opacity = 1.0
+        effect = item_widget_to_remove.graphicsEffect()
+        if isinstance(effect, QGraphicsOpacityEffect):
+            current_opacity = effect.opacity()
+        fade_anim.setStartValue(current_opacity)
+        fade_anim.setEndValue(0.0)
+        group_anim.addAnimation(fade_anim)
+        geom_anim = QPropertyAnimation(
+            item_widget_to_remove, QByteArray(b"maximumHeight"))
+        geom_anim.setDuration(FluentAnimation.DURATION_FAST)
+        geom_anim.setStartValue(item_widget_to_remove.height())
+        geom_anim.setEndValue(0)
+        geom_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        group_anim.addAnimation(geom_anim)
 
-        item = self._items.pop(index)
-        self._layout.removeWidget(item)
-        item.setParent(None)
-        item.deleteLater()
+        def on_finished_removal():
+            if item_widget_to_remove in self._items:
+                self._items.remove(item_widget_to_remove)
+            if self._layout_internal and item_widget_to_remove.parent() == self._content_widget_internal:
+                self._layout_internal.removeWidget(item_widget_to_remove)
+            item_widget_to_remove.setParent(None)
+            item_widget_to_remove.deleteLater()
+        group_anim.finished.connect(on_finished_removal)
+        group_anim.start()
 
     def item(self, index: int) -> Optional[FluentTimelineItem]:
         """Get item at index"""
@@ -512,43 +518,112 @@ class FluentTimeline(QScrollArea):
 
     def clear(self):
         """Clear all items"""
-        while self._items:
-            item = self._items.pop(0)
-            self._layout.removeWidget(item)
-            item.setParent(None)
-            item.deleteLater()
+        if not self._items or not self._layout_internal:
+            self._items.clear()
+            if self._layout_internal:
+                while self._layout_internal.count() > 1:
+                    child = self._layout_internal.takeAt(0)
+                    if child and child.widget():
+                        child.widget().setParent(None)
+                        child.widget().deleteLater()
+            return
+
+        master_removal_animation = FluentParallel(self)
+        for item_widget in list(self._items):
+            group_anim = FluentParallel(item_widget)  # This is FluentParallel
+            fade_anim = FluentTransition._create_fade_transition(
+                item_widget, FluentAnimation.DURATION_FAST, FluentTransition.EASE_SMOOTH)
+            current_opacity = 1.0
+            effect = item_widget.graphicsEffect()
+            if isinstance(effect, QGraphicsOpacityEffect):
+                current_opacity = effect.opacity()
+            fade_anim.setStartValue(current_opacity)
+            fade_anim.setEndValue(0.0)
+            # This expects QPropertyAnimation
+            group_anim.addAnimation(fade_anim)
+
+            geom_anim = QPropertyAnimation(
+                item_widget, QByteArray(b"maximumHeight"))
+            geom_anim.setDuration(FluentAnimation.DURATION_FAST)
+            geom_anim.setStartValue(item_widget.height())
+            geom_anim.setEndValue(0)
+            geom_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+            # This expects QPropertyAnimation
+            group_anim.addAnimation(geom_anim)
+
+            # To add a FluentParallel's underlying QParallelAnimationGroup to another:
+            if hasattr(master_removal_animation, '_parallel') and hasattr(group_anim, '_parallel'):
+                master_removal_animation._parallel.addAnimation(
+                    group_anim._parallel)
+
+        def after_all_cleared():
+            for item_widget_to_clear in list(self._items):
+                if self._layout_internal and item_widget_to_clear.parent() == self._content_widget_internal:
+                    self._layout_internal.removeWidget(item_widget_to_clear)
+                item_widget_to_clear.setParent(None)
+                item_widget_to_clear.deleteLater()
+            self._items.clear()
+        master_removal_animation.finished.connect(after_all_cleared)
+        master_removal_animation.start()
 
     def setReverseOrder(self, reverse: bool):
         """Set whether to display items in reverse order (newest first)"""
-        if self._reverse_order != reverse:
-            self._reverse_order = reverse
+        if self._reverse_order == reverse or not self._layout_internal or not self._content_widget_internal:
+            return
+        self._reverse_order = reverse
+        items_copy = list(self._items)
+        group_fade_out = FluentParallel(self)
+        for itm in items_copy:
+            anim = FluentTransition._create_fade_transition(
+                itm, FluentAnimation.DURATION_FAST, FluentTransition.EASE_SMOOTH)
+            anim.setEndValue(0.0)
+            group_fade_out.addAnimation(anim)
 
-            # Reorder items in the layout
-            items_copy = list(self._items)  # Shallow copy of item references
+        def reorder_and_fade_in():
+            if self._layout_internal and self._content_widget_internal:  # Ensure layout is valid
+                for i in range(self._layout_internal.count() - 1, -1, -1):
+                    layout_item = self._layout_internal.itemAt(i)
+                    if layout_item and layout_item.widget() and layout_item.widget() in items_copy:
+                        widget = layout_item.widget()
+                        self._layout_internal.removeWidget(widget)
+                        widget.setParent(None)
+                self._items.clear()
+                if reverse:
+                    items_copy.reverse()
+                group_fade_in = FluentParallel(self)
+                for itm_to_add in items_copy:
+                    if self._reverse_order:
+                        self._layout_internal.insertWidget(0, itm_to_add)
+                        self._items.insert(0, itm_to_add)
+                    else:
+                        self._layout_internal.insertWidget(
+                            len(self._items), itm_to_add)
+                        self._items.append(itm_to_add)
+                    itm_to_add.setParent(self._content_widget_internal)
+                    itm_to_add.show()
 
-            # Clear layout but keep item objects
-            for _ in range(self._layout.count() - 1):  # -1 for the stretch
-                layout_item = self._layout.takeAt(0)
-                if layout_item and layout_item.widget():
-                    layout_item.widget().setParent(None)  # Detach from layout
+                    current_effect = itm_to_add.graphicsEffect()
+                    if not isinstance(current_effect, QGraphicsOpacityEffect):
+                        opacity_effect = QGraphicsOpacityEffect(itm_to_add)
+                        itm_to_add.setGraphicsEffect(opacity_effect)
+                        opacity_effect.setOpacity(0.0)
+                    elif current_effect:  # It is QGraphicsEffect but maybe not QGraphicsOpacityEffect
+                        current_effect.setOpacity(0.0)  # type: ignore
 
-            self._items.clear()  # Clear internal list
+                    anim_in = FluentTransition._create_fade_transition(
+                        itm_to_add, FluentAnimation.DURATION_MEDIUM, FluentTransition.EASE_SMOOTH)
+                    anim_in.setStartValue(0.0)  # Ensure start from transparent
+                    anim_in.setEndValue(1.0)
+                    group_fade_in.addAnimation(anim_in)
+                group_fade_in.start()
+            else:  # Fallback if layout became invalid somehow
+                self._items.clear()
 
-            if reverse:
-                items_copy.reverse()
-
-            for itm in items_copy:
-                # Re-add to internal list and layout
-                # The addItem logic will handle reverse order correctly if called now
-                # but to avoid re-creating signals, we add directly
-                if self._reverse_order:  # If now reverse, add to top of layout
-                    self._layout.insertWidget(0, itm)
-                    self._items.insert(0, itm)
-                else:  # Add to bottom (before stretch)
-                    self._layout.insertWidget(len(self._items), itm)
-                    self._items.append(itm)
-                # Ensure parent is correct for layout
-                itm.setParent(self._content_widget)
+        if items_copy:
+            group_fade_out.finished.connect(reorder_and_fade_in)
+            group_fade_out.start()
+        else:
+            reorder_and_fade_in()
 
     def reverseOrder(self) -> bool:
         """Check if items are in reverse order"""
@@ -562,13 +637,15 @@ class FluentTimeline(QScrollArea):
 
     def scrollToTop(self):
         """Scroll to top"""
-        if self.verticalScrollBar():
-            self.verticalScrollBar().setValue(0)
+        scroll_bar = self.verticalScrollBar()
+        if scroll_bar:
+            scroll_bar.setValue(0)
 
     def scrollToBottom(self):
         """Scroll to bottom"""
-        if self.verticalScrollBar():
-            self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
+        scroll_bar = self.verticalScrollBar()
+        if scroll_bar:
+            scroll_bar.setValue(scroll_bar.maximum())
 
     def _on_item_clicked_ref(self, item_ref: FluentTimelineItem):
         """Handle item clicked using item reference"""
@@ -576,11 +653,12 @@ class FluentTimeline(QScrollArea):
             index = self._items.index(item_ref)
             self.item_clicked.emit(index)
         except ValueError:
-            # Item not found, should not happen if managed correctly
             pass
 
-    def _on_theme_changed(self, _=None):  # Add default for signal argument
+    def _on_theme_changed(self, _=None):
         """Handle theme change"""
         self._setup_style()
+        FluentRevealEffect.fade_in(
+            self, duration=FluentAnimation.DURATION_FAST)
         for item_widget in self._items:
-            item_widget._on_theme_changed()  # Propagate theme change to items
+            item_widget._on_theme_changed()
