@@ -616,13 +616,18 @@ class FluentOrgChart(QWidget):
 
         if not root_nodes:
             # If no clear hierarchy, treat first node as root
+            # This check is safe because we return early if self._nodes is empty
             root_nodes = [list(self._nodes.keys())[0]]
 
         # Calculate positions level by level
         self._node_positions.clear()
 
+        current_x_offset = 0.0
         for root_id in root_nodes:
-            self._position_subtree(root_id, 0, 0, children_map)
+            # Ensure multiple root nodes are laid out side-by-side
+            subtree_width = self._position_subtree(
+                root_id, 0, current_x_offset, children_map)
+            current_x_offset += subtree_width
 
     def _position_subtree(self, node_id: str, level: int, x_offset: float,
                           children_map: Dict[str, List[str]]) -> float:
@@ -647,13 +652,14 @@ class FluentOrgChart(QWidget):
             total_width += child_width
 
         # Position parent node centered above children
-        parent_x = x_offset + (total_width - self._node_spacing) / 2
+        # Fixed: Use _node_size[0] for centering
+        parent_x = x_offset + (total_width - self._node_size[0]) / 2
         parent_y = level * self._level_height + 40
         self._node_positions[node_id] = (parent_x, parent_y)
 
         return total_width
 
-    def paintEvent(self, _):
+    def paintEvent(self, event):  # Renamed _ to event for clarity, though _ is fine
         """Paint organization chart"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -736,6 +742,7 @@ class FluentOrgChart(QWidget):
             }.get(status.lower(), theme.get_color('text_secondary'))
 
             painter.setBrush(QBrush(status_color))
+            # Use a non-stroking pen or set to Qt.NoPen for solid fill
             painter.setPen(QPen(status_color))
             painter.drawEllipse(
                 int(x) + self._node_size[0] - 20, int(y) + 8, 8, 8)
@@ -748,7 +755,7 @@ class FluentOrgChart(QWidget):
                 y), self._node_size[0], self._node_size[1])
 
             if node_rect.contains(event.pos()):
-                node_data = self._nodes[node_id]
+                node_data = self._nodes[node_id].copy()  # Emit a copy
                 node_data['id'] = node_id
 
                 if event.button() == Qt.MouseButton.LeftButton:
@@ -763,7 +770,7 @@ class FluentOrgChart(QWidget):
                 y), self._node_size[0], self._node_size[1])
 
             if node_rect.contains(event.pos()):
-                node_data = self._nodes[node_id]
+                node_data = self._nodes[node_id].copy()  # Emit a copy
                 node_data['id'] = node_id
                 self.node_double_clicked.emit(node_data)
                 break
@@ -779,7 +786,7 @@ class FluentOrgChart(QWidget):
             }}
         """)
 
-    def _on_theme_changed(self, _):
+    def _on_theme_changed(self, _):  # Renamed to _ as it's unused
         """Handle theme change"""
         self._setup_style()
         self.update()

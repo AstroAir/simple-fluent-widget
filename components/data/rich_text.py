@@ -8,13 +8,17 @@ from typing import Protocol, runtime_checkable
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                                QTextEdit, QToolBar, QFrame, QSizePolicy,
                                QColorDialog, QFontComboBox, QComboBox, QPushButton,
-                               QMenu, QDialog)
-from PySide6.QtCore import Qt, Signal, QRegularExpression, QSize
+                               QMenu, QDialog, QGraphicsOpacityEffect)
+from PySide6.QtCore import (Qt, Signal, QRegularExpression, QSize,
+                            QPropertyAnimation, QByteArray)
 from PySide6.QtGui import (QAction, QValidator, QTextCharFormat, QFont, QColor, QTextCursor,
                            QRegularExpressionValidator, QTextListFormat, QTextBlockFormat,
                            QTextDocumentFragment)
 from core.theme import theme_manager
-from typing import Optional, Dict, Any
+from core.enhanced_animations import (FluentMicroInteraction, FluentTransition,
+                                      FluentRevealEffect, FluentStateTransition,
+                                      FluentParallel)
+from typing import Optional, Dict, Any, List
 
 
 class FluentMaskedInput(QLineEdit):
@@ -174,11 +178,11 @@ class FluentMaskedInput(QLineEdit):
 
 class FluentRichTextEditor(QWidget):
     """Fluent Design Style Rich Text Editor
-    
+
     A QWidget-based rich text editor that follows the Fluent Design guidelines.
     Provides text formatting, styling, and editing capabilities.
     """
-    
+
     #: Signal emitted when text content changes
     textChanged = Signal()
 
@@ -190,12 +194,15 @@ class FluentRichTextEditor(QWidget):
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(0)
 
-        # Create toolbar
-        self._create_toolbar()
-
         # Create text edit
         self._text_edit = QTextEdit(self)
         self._text_edit.textChanged.connect(self.textChanged)
+
+        # Create and setup toolbar with animation
+        self._create_toolbar()
+        self._toolbar.hide()  # Start hidden
+        self._toolbar_transition = FluentTransition.create_transition(
+            self._toolbar, FluentTransition.FADE)
 
         # Add widgets to layout
         self._layout.addWidget(self._toolbar)
@@ -204,9 +211,18 @@ class FluentRichTextEditor(QWidget):
         # Set minimum size
         self.setMinimumSize(300, 200)
 
+        # Setup state transitions
+        self._setup_states()
+
         # Apply styling
         self._apply_style()
         theme_manager.theme_changed.connect(self._on_theme_changed)
+
+        # Show toolbar with animation
+        self._toolbar.show()
+        self._toolbar_transition.setStartValue(0.0)
+        self._toolbar_transition.setEndValue(1.0)
+        self._toolbar_transition.start()
 
     def _create_toolbar(self):
         """Create and configure the formatting toolbar"""
@@ -218,16 +234,22 @@ class FluentRichTextEditor(QWidget):
         self._action_bold.setCheckable(True)
         self._action_bold.setShortcut("Ctrl+B")
         self._action_bold.triggered.connect(self._format_bold)
+        self._action_bold.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         self._action_italic = QAction("Italic", self)
         self._action_italic.setCheckable(True)
         self._action_italic.setShortcut("Ctrl+I")
         self._action_italic.triggered.connect(self._format_italic)
+        self._action_italic.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         self._action_underline = QAction("Underline", self)
         self._action_underline.setCheckable(True)
         self._action_underline.setShortcut("Ctrl+U")
         self._action_underline.triggered.connect(self._format_underline)
+        self._action_underline.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         # Font family combo box
         self._font_combobox = QFontComboBox(self)
@@ -248,38 +270,54 @@ class FluentRichTextEditor(QWidget):
         self._action_align_left.setCheckable(True)
         self._action_align_left.triggered.connect(
             lambda: self._format_alignment(Qt.AlignmentFlag.AlignLeft))
+        self._action_align_left.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         self._action_align_center = QAction("Align Center", self)
         self._action_align_center.setCheckable(True)
         self._action_align_center.triggered.connect(
             lambda: self._format_alignment(Qt.AlignmentFlag.AlignHCenter))
+        self._action_align_center.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         self._action_align_right = QAction("Align Right", self)
         self._action_align_right.setCheckable(True)
         self._action_align_right.triggered.connect(
             lambda: self._format_alignment(Qt.AlignmentFlag.AlignRight))
+        self._action_align_right.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         self._action_align_justify = QAction("Justify", self)
         self._action_align_justify.setCheckable(True)
         self._action_align_justify.triggered.connect(
             lambda: self._format_alignment(Qt.AlignmentFlag.AlignJustify))
+        self._action_align_justify.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         # List actions
         self._action_bullet_list = QAction("Bullet List", self)
         self._action_bullet_list.setCheckable(True)
         self._action_bullet_list.triggered.connect(self._format_bullet_list)
+        self._action_bullet_list.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         self._action_number_list = QAction("Number List", self)
         self._action_number_list.setCheckable(True)
         self._action_number_list.triggered.connect(self._format_number_list)
+        self._action_number_list.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         # Color selection
         self._action_text_color = QAction("Text Color", self)
         self._action_text_color.triggered.connect(self._format_text_color)
+        self._action_text_color.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         # Link action
         self._action_insert_link = QAction("Insert Link", self)
         self._action_insert_link.triggered.connect(self._insert_link)
+        self._action_insert_link.hovered.connect(
+            lambda: FluentMicroInteraction.hover_glow(self._toolbar))
 
         # Add actions to toolbar
         self._toolbar.addAction(self._action_bold)
@@ -379,24 +417,82 @@ class FluentRichTextEditor(QWidget):
         """Handle theme changes"""
         self._apply_style()
 
+    def _setup_states(self):
+        """Setup widget states with transitions"""
+        self._state_transition = FluentStateTransition(self)
+
+        # Normal state
+        self._state_transition.addState("default", {
+            "styleSheet": self.styleSheet()
+        })
+
+        # Focus state
+        focus_style = self.styleSheet() + """
+            QTextEdit:focus {
+                border-color: %s;
+                border-width: 2px;
+            }
+        """ % theme_manager.get_color('primary').name()
+
+        self._state_transition.addState("focus", {
+            "styleSheet": focus_style
+        })
+
     def _format_bold(self):
         """Toggle bold formatting"""
+        # Create format
         fmt = QTextCharFormat()
         fmt.setFontWeight(
             QFont.Weight.Bold if self._action_bold.isChecked() else QFont.Weight.Normal)
-        self._merge_format(fmt)
+
+        # Apply format with reveal animation
+        cursor = self._text_edit.textCursor()
+        if cursor.hasSelection():
+            start = cursor.selectionStart()
+            end = cursor.selectionEnd()
+            self._merge_format(fmt)
+
+            # Add reveal animation for formatted text
+            text_block = self._text_edit.document().findBlock(start)
+            while text_block.isValid() and text_block.position() <= end:
+                if text_block.contains(start) or text_block.contains(end) or \
+                   (text_block.position() > start and text_block.position() < end):
+                    FluentRevealEffect.fade_in(self._text_edit, duration=200)
+                text_block = text_block.next()
+        else:
+            self._merge_format(fmt)
 
     def _format_italic(self):
-        """Toggle italic formatting"""
+        """Toggle italic formatting with animation"""
         fmt = QTextCharFormat()
         fmt.setFontItalic(self._action_italic.isChecked())
-        self._merge_format(fmt)
+
+        cursor = self._text_edit.textCursor()
+        if cursor.hasSelection():
+            start = cursor.selectionStart()
+            end = cursor.selectionEnd()
+            self._merge_format(fmt)
+
+            # Add reveal animation with slide
+            FluentRevealEffect.slide_in(
+                self._text_edit, duration=200, direction="right")
+        else:
+            self._merge_format(fmt)
+            self._state_transition.transitionTo("focus")
 
     def _format_underline(self):
-        """Toggle underline formatting"""
+        """Toggle underline formatting with animation"""
         fmt = QTextCharFormat()
         fmt.setFontUnderline(self._action_underline.isChecked())
-        self._merge_format(fmt)
+
+        cursor = self._text_edit.textCursor()
+        if cursor.hasSelection():
+            self._merge_format(fmt)
+            # Add reveal animation with scale
+            FluentRevealEffect.scale_in(self._text_edit, duration=150)
+        else:
+            self._merge_format(fmt)
+            self._state_transition.transitionTo("focus")
 
     def _format_font_family(self, font: QFont):
         """Set font family"""
@@ -415,7 +511,7 @@ class FluentRichTextEditor(QWidget):
         self._text_edit.setAlignment(alignment)
 
     def _format_text_color(self):
-        """Change text color"""
+        """Change text color with animation"""
         color = QColorDialog.getColor(
             self._text_edit.textColor(),
             self,
@@ -427,8 +523,14 @@ class FluentRichTextEditor(QWidget):
             fmt.setForeground(color)
             self._merge_format(fmt)
 
+            # Add color change animation
+            cursor = self._text_edit.textCursor()
+            if cursor.hasSelection():
+                # Reveal animation for color change
+                FluentRevealEffect.reveal_fade(self._text_edit, duration=200)
+
     def _format_bullet_list(self):
-        """Toggle bullet list"""
+        """Toggle bullet list with animation"""
         cursor = self._text_edit.textCursor()
         list_format = QTextListFormat()
 
@@ -436,15 +538,24 @@ class FluentRichTextEditor(QWidget):
             list_format.setStyle(QTextListFormat.Style.ListDisc)
             list_format.setIndent(1)
             cursor.createList(list_format)
+
+            # Reveal animation for each list item
+            block = cursor.block()
+            while block.isValid() and (not cursor.hasSelection() or block.position() <= cursor.selectionEnd()):
+                FluentRevealEffect.reveal_up(self._text_edit, delay=50)
+                block = block.next()
         else:
             current_list = cursor.currentList()
             if current_list:
                 current_list.setFormat(QTextListFormat())
+                # Fade out animation
+                FluentRevealEffect.fade_in(self._text_edit, duration=150)
 
+        self._state_transition.transitionTo("focus")
         self._text_edit.setFocus()
 
     def _format_number_list(self):
-        """Toggle numbered list"""
+        """Toggle numbered list with animation"""
         cursor = self._text_edit.textCursor()
         list_format = QTextListFormat()
 
@@ -452,36 +563,108 @@ class FluentRichTextEditor(QWidget):
             list_format.setStyle(QTextListFormat.Style.ListDecimal)
             list_format.setIndent(1)
             cursor.createList(list_format)
+
+            # Staggered reveal for list items
+            blocks: List[QWidget] = []
+            block = cursor.block()
+            while block.isValid() and (not cursor.hasSelection() or block.position() <= cursor.selectionEnd()):
+                blocks.append(self._text_edit)
+                block = block.next()
+
+            if blocks:
+                FluentRevealEffect.staggered_reveal(blocks, stagger_delay=50)
         else:
             current_list = cursor.currentList()
             if current_list:
                 current_list.setFormat(QTextListFormat())
+                FluentRevealEffect.fade_in(self._text_edit, duration=150)
 
+        self._state_transition.transitionTo("focus")
         self._text_edit.setFocus()
 
     def _insert_link(self):
-        """Insert hyperlink"""
-        # Get link text and URL
+        """Insert hyperlink with animations"""
         cursor = self._text_edit.textCursor()
         selected_text = cursor.selectedText()
 
-        # Simple implementation - in a real app, you'd show a dialog
-        link_text = selected_text if selected_text else "link text"
-        link_url = "http://example.com"
+        # Create and show dialog with animation
+        dialog = FluentLinkDialog(self, initial_text=selected_text)
 
-        # Insert link
-        cursor.insertHtml(f'<a href="{link_url}">{link_text}</a>')
+        # Setup dialog animations using QPropertyAnimation directly
+        opacity_effect = QGraphicsOpacityEffect(dialog)
+        dialog.setGraphicsEffect(opacity_effect)
+        opacity_effect.setOpacity(0)
+
+        # Create fade in animation
+        fade_in = QPropertyAnimation(
+            opacity_effect, QByteArray(b"opacity"), dialog)
+        fade_in.setDuration(200)
+        fade_in.setStartValue(0.0)
+        fade_in.setEndValue(1.0)
+        fade_in.setEasingCurve(FluentTransition.EASE_SMOOTH)
+
+        # Show dialog with animation
+        fade_in.start()
+
+        if dialog.exec():
+            link_data = dialog.get_link_data()
+            cursor.insertHtml(
+                f'<a href="{link_data["url"]}">{link_data["text"]}</a>')
+
+            # Create animations for link insertion
+            parallel = FluentParallel(self)
+
+            # Create fade effect
+            effect = QGraphicsOpacityEffect(self._text_edit)
+            self._text_edit.setGraphicsEffect(effect)
+            fade_anim = QPropertyAnimation(effect, QByteArray(b"opacity"))
+            fade_anim.setDuration(200)
+            fade_anim.setStartValue(0.8)
+            fade_anim.setEndValue(1.0)
+            fade_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+
+            # Create scale effect
+            original_geom = self._text_edit.geometry()
+            scale_anim = QPropertyAnimation(
+                self._text_edit, QByteArray(b"geometry"))
+            scale_anim.setDuration(200)
+            scale_anim.setStartValue(original_geom)
+            scaled_geom = original_geom.adjusted(-2, -2, 2, 2)
+            scale_anim.setEndValue(scaled_geom)
+            scale_anim.setEasingCurve(FluentTransition.EASE_SPRING)
+
+            # Add animations to parallel group
+            parallel.addAnimation(fade_anim)
+            parallel.addAnimation(scale_anim)
+            parallel.start()
+
+        # Fade out dialog
+        fade_out = QPropertyAnimation(
+            opacity_effect, QByteArray(b"opacity"), dialog)
+        fade_out.setDuration(150)
+        fade_out.setStartValue(1.0)
+        fade_out.setEndValue(0.0)
+        fade_out.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        fade_out.start()
+
+        self._state_transition.transitionTo("focus")
         self._text_edit.setFocus()
 
     def _merge_format(self, fmt: QTextCharFormat):
-        """Apply formatting to selected text"""
+        """Apply formatting to selected text with animation"""
         cursor = self._text_edit.textCursor()
 
         if cursor.hasSelection():
+            # Apply format
             cursor.mergeCharFormat(fmt)
+
+            # Add micro-interaction
+            FluentMicroInteraction.ripple_effect(self._text_edit)
         else:
             self._text_edit.mergeCurrentCharFormat(fmt)
 
+        # Transition to focus state
+        self._state_transition.transitionTo("focus")
         self._text_edit.setFocus()
 
     def set_html(self, html: str):
@@ -494,7 +677,7 @@ class FluentRichTextEditor(QWidget):
 
     def get_html(self) -> str:
         """Get content as HTML
-        
+
         Returns:
             str: The editor content as HTML
         """
@@ -510,7 +693,7 @@ class FluentRichTextEditor(QWidget):
 
     def get_plain_text(self) -> str:
         """Get content as plain text
-        
+
         Returns:
             str: The editor content as plain text
         """

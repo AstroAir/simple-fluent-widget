@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (QTableWidget, QTableWidgetItem, QListWidget, QLis
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from core.theme import theme_manager
-from core.enhanced_animations import (FluentMicroInteraction, FluentTransition, 
-                                     FluentStateTransition, FluentRevealEffect)
+from core.enhanced_animations import (FluentMicroInteraction, FluentTransition,
+                                      FluentStateTransition, FluentRevealEffect)
 from ..basic.button import FluentButton
 from ..basic.textbox import FluentLineEdit
 from typing import Optional, List, Any
@@ -24,13 +24,13 @@ class FluentTableWidget(QTableWidget):
 
         self._state_transition = FluentStateTransition(self)
         self._is_hovered = False
-        
+
         self._setup_enhanced_animations()
         self._setup_style()
         self._setup_behavior()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
-        
+
         # Add reveal animation when created
         FluentRevealEffect.reveal_fade(self, 400)
 
@@ -40,7 +40,7 @@ class FluentTableWidget(QTableWidget):
         self._state_transition.addState("normal", {
             "minimumHeight": 200,
         })
-        
+
         self._state_transition.addState("hovered", {
             "minimumHeight": 202,
         }, duration=150, easing=FluentTransition.EASE_SMOOTH)

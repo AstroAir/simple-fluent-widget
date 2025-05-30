@@ -10,11 +10,11 @@ import json
 import re
 from typing import Any, Dict, List, Union
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
-                               QTreeWidget, QTreeWidgetItem, 
-                               QPushButton, QLabel, QLineEdit, 
+                               QTreeWidget, QTreeWidgetItem,
+                               QPushButton, QLabel, QLineEdit,
                                QHeaderView, QTabWidget)
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import (QFont, QColor, 
+from PySide6.QtGui import (QFont, QColor, QSyntaxHighlighter,
                            QTextDocument, QTextCharFormat)
 
 # Import theme manager
@@ -263,21 +263,21 @@ class FluentJsonTreeWidget(QTreeWidget):
                 # Parse path
                 parts = self.parse_path(path)
                 for part in parts:
-                    if value is None: # Check if value became None during path traversal
+                    if value is None:  # Check if value became None during path traversal
                         break
                     if isinstance(part, int):
                         if isinstance(value, list) and 0 <= part < len(value):
                             value = value[part]
                         else:
-                            value = None # Path is invalid
+                            value = None  # Path is invalid
                             break
-                    else: # part is a string (key)
+                    else:  # part is a string (key)
                         if isinstance(value, dict) and part in value:
                             value = value[part]
                         else:
-                            value = None # Path is invalid
+                            value = None  # Path is invalid
                             break
-                
+
                 if value is not None:
                     self.item_selected.emit(path, value)
 
@@ -301,8 +301,9 @@ class FluentJsonTreeWidget(QTreeWidget):
             elif char == ']':
                 if current.isdigit():
                     parts.append(int(current))
-                else: # Should ideally not happen if path is well-formed for list indices
-                    parts.append(current) # Keep as string if not a digit inside brackets
+                else:  # Should ideally not happen if path is well-formed for list indices
+                    # Keep as string if not a digit inside brackets
+                    parts.append(current)
                 current = ""
                 in_bracket = False
             elif char == '.' and not in_bracket:
@@ -316,7 +317,7 @@ class FluentJsonTreeWidget(QTreeWidget):
             # Last part, if it's an index it should have been closed by ']'
             # So, if in_bracket is true here, it's likely a malformed path.
             # However, the original logic handles it as potentially an index.
-            if current.isdigit() and in_bracket: # This case might be problematic
+            if current.isdigit() and in_bracket:  # This case might be problematic
                 parts.append(int(current))
             else:
                 parts.append(current)
@@ -505,7 +506,6 @@ class FluentJsonViewer(QWidget):
         self.highlighter.setup_highlighting_rules()
         self.highlighter.rehighlight()
 
-
     def set_json(self, data: Union[str, Dict, List]):
         """Set JSON data"""
         try:
@@ -562,14 +562,14 @@ class FluentJsonViewer(QWidget):
 
         if not text:
             self.is_valid = True
-            self.json_data = None # Ensure json_data is None for empty text
+            self.json_data = None  # Ensure json_data is None for empty text
             self.validation_label.setText("Empty")
             self.validation_label.setStyleSheet(
                 "color: gray; font-weight: bold;")
             self.status_label.setText("Ready")
-            self.tree_widget.clear() # Clear tree view for empty JSON
+            self.tree_widget.clear()  # Clear tree view for empty JSON
             self.json_changed.emit(self.json_data)
-            self.validation_changed.emit(True, "") # Empty is considered valid
+            self.validation_changed.emit(True, "")  # Empty is considered valid
             return
 
         try:
@@ -589,7 +589,7 @@ class FluentJsonViewer(QWidget):
 
         except json.JSONDecodeError as e:
             self.is_valid = False
-            self.json_data = None # Invalid JSON means no valid data
+            self.json_data = None  # Invalid JSON means no valid data
             error_msg = f"Line {e.lineno}, Column {e.colno}: {e.msg}"
             self.validation_label.setText(f"✗ Invalid JSON")
             self.validation_label.setStyleSheet(
@@ -606,10 +606,9 @@ class FluentJsonViewer(QWidget):
             self.text_edit.setPlainText(formatted)
             self.status_label.setText("JSON formatted")
         elif not self.text_edit.toPlainText().strip():
-             self.status_label.setText("Cannot format empty JSON")
+            self.status_label.setText("Cannot format empty JSON")
         else:
             self.status_label.setText("Cannot format invalid JSON")
-
 
     def minify_json(self):
         """Minify JSON (remove whitespace)"""
@@ -623,7 +622,6 @@ class FluentJsonViewer(QWidget):
         else:
             self.status_label.setText("Cannot minify invalid JSON")
 
-
     def clear_json(self):
         """Clear JSON content"""
         self.text_edit.clear()
@@ -636,7 +634,6 @@ class FluentJsonViewer(QWidget):
         self.status_label.setText("Ready")
         self.json_changed.emit(None)
         self.validation_changed.emit(True, "")
-
 
     def on_tree_item_selected(self, path: str, value: Any):
         """Handle tree item selection"""

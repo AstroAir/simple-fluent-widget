@@ -5,10 +5,11 @@ Fluent Design Style Dialog and Notification Components
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                                QWidget, QGraphicsOpacityEffect, QApplication,
                                QLineEdit)
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QByteArray
+from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QRect, QByteArray, QPoint
 from PySide6.QtGui import QColor
 from core.theme import theme_manager
 from core.animation import FluentAnimation
+from core.enhanced_animations import FluentTransition, FluentMicroInteraction
 from ..basic.button import FluentButton
 from typing import Optional, Callable, List, Tuple
 
@@ -105,22 +106,24 @@ class FluentDialog(QDialog):
 
     def _setup_animations(self):
         """Setup animations"""
-        # Fade in animation
+        # Fade in animation with enhanced easing
         self.fade_effect = QGraphicsOpacityEffect()
         self.setGraphicsEffect(self.fade_effect)
 
-        self.fade_animation = QPropertyAnimation(
-            self.fade_effect, QByteArray(b"opacity"))
-        self.fade_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
+        self.fade_animation = FluentTransition.create_transition(
+            self, FluentTransition.FADE,
+            duration=FluentAnimation.DURATION_MEDIUM,
+            easing=FluentTransition.EASE_SPRING
+        )
         self.fade_animation.setStartValue(0.0)
         self.fade_animation.setEndValue(1.0)
-        self.fade_animation.setEasingCurve(FluentAnimation.EASE_OUT)
 
-        # Scale animation
-        self.scale_animation = QPropertyAnimation(
-            self, QByteArray(b"geometry"))
-        self.scale_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
-        self.scale_animation.setEasingCurve(FluentAnimation.EASE_OUT)
+        # Scale animation with enhanced easing
+        self.scale_animation = FluentTransition.create_transition(
+            self, FluentTransition.SCALE,
+            duration=FluentAnimation.DURATION_MEDIUM,
+            easing=FluentTransition.EASE_SPRING
+        )
 
     def add_content_widget(self, widget: QWidget):
         """**Add content widget**"""
@@ -134,6 +137,11 @@ class FluentDialog(QDialog):
 
         if callback:
             button.clicked.connect(callback)
+
+        # Add micro-interaction to button
+        button.pressed.connect(
+            lambda: FluentMicroInteraction.button_press(button, scale=0.95)
+        )
 
         self.button_layout.addWidget(button)
         return button
@@ -168,13 +176,14 @@ class FluentDialog(QDialog):
 
     def close_animated(self):
         """**Close with animation**"""
-        # Fade out animation
-        fade_out = QPropertyAnimation(self.fade_effect, QByteArray(b"opacity"))
-        fade_out.setDuration(FluentAnimation.DURATION_FAST)
+        # Fade out animation with enhanced easing
+        fade_out = FluentTransition.create_transition(
+            self, FluentTransition.FADE,
+            duration=FluentAnimation.DURATION_FAST,
+            easing=FluentTransition.EASE_SMOOTH
+        )
         fade_out.setStartValue(1.0)
         fade_out.setEndValue(0.0)
-        fade_out.setEasingCurve(FluentAnimation.EASE_IN)
-
         fade_out.finished.connect(self.close)
         fade_out.start()
 

@@ -1,6 +1,6 @@
 """
-Fluent Design Data Entry Components
-Advanced input fields, editors, and form controls
+Fluent Design Data Entry Components with Enhanced Animations
+Advanced input fields, editors, and form controls with modern animation effects
 """
 
 from PySide6.QtWidgets import (QWidget, QLineEdit, QTextEdit, QComboBox, QDateEdit,
@@ -15,12 +15,14 @@ from PySide6.QtGui import (QValidator, QRegularExpressionValidator, QFont, QPixm
                            QIcon, QPainter, QColor, QBrush, QPen, QLinearGradient)
 from core.theme import theme_manager
 from core.animation import FluentAnimation
+from core.enhanced_animations import (FluentTransition, FluentMicroInteraction,
+                                      FluentRevealEffect, FluentSequence, FluentStateTransition)
 from typing import Optional, List, Dict, Any, Callable
 import re
 
 
 class FluentMaskedLineEdit(QLineEdit):
-    """Fluent Design style masked input field"""
+    """Fluent Design style masked input field with enhanced animations"""
 
     def __init__(self, mask: str = "", placeholder: str = "", parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -29,22 +31,55 @@ class FluentMaskedLineEdit(QLineEdit):
         self._original_placeholder = placeholder
         self._mask_chars = {'#': r'\d', 'A': r'[A-Za-z]', '*': r'.'}
 
+        self._setup_animations()
         self.setPlaceholderText(placeholder)
         self._setup_style()
         self._setup_validator()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
-    def setInputMask(self, mask: str):
-        """Set input mask pattern
+    def _setup_animations(self):
+        """Setup enhanced animation system"""
+        # Setup state transitions for input field
+        self._state_transition = FluentStateTransition(self)
 
-        Args:
-            mask: Mask pattern (# = digit, A = letter, * = any)
-                 Example: "##/##/####" for date, "(###) ###-####" for phone
-        """
+        self._state_transition.addState("normal", {
+            "border": f"2px solid {theme_manager.get_color('border').name()}",
+        })
+
+        self._state_transition.addState("focused", {
+            "border": f"2px solid {theme_manager.get_color('primary').name()}",
+        }, duration=200, easing=FluentTransition.EASE_SMOOTH)
+
+        self._state_transition.addState("error", {
+            "border": f"2px solid {theme_manager.get_color('error').name()}",
+        }, duration=150, easing=FluentTransition.EASE_CRISP)
+
+        # Entrance animation
+        QTimer.singleShot(50, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation"""
+        FluentRevealEffect.fade_in(self, 200)
+
+    def focusInEvent(self, event):
+        """Enhanced focus in event with animation"""
+        super().focusInEvent(event)
+        self._state_transition.transitionTo("focused")
+        FluentMicroInteraction.hover_glow(self, intensity=0.1)
+
+    def focusOutEvent(self, event):
+        """Enhanced focus out event with animation"""
+        super().focusOutEvent(event)
+        self._state_transition.transitionTo("normal")
+
+    def setInputMask(self, mask: str):
+        """Set input mask pattern with animation feedback"""
         self._mask_pattern = mask
         self._setup_validator()
         self._update_placeholder()
+        # Add subtle pulse feedback
+        FluentMicroInteraction.pulse_animation(self, scale=1.02)
 
     def _setup_validator(self):
         """Setup input validator based on mask"""
@@ -72,6 +107,15 @@ class FluentMaskedLineEdit(QLineEdit):
                 f"{self._original_placeholder} ({placeholder})")
         else:
             self.setPlaceholderText(self._original_placeholder)
+
+    def show_error(self):
+        """Show error state with animation"""
+        self._state_transition.transitionTo("error")
+        FluentMicroInteraction.shake_animation(self, intensity=3)
+
+    def clear_error(self):
+        """Clear error state with animation"""
+        self._state_transition.transitionTo("normal")
 
     def _setup_style(self):
         """Setup style"""
@@ -110,7 +154,7 @@ class FluentMaskedLineEdit(QLineEdit):
 
 
 class FluentAutoCompleteEdit(QLineEdit):
-    """Fluent Design style auto-complete input field"""
+    """Fluent Design style auto-complete input field with enhanced animations"""
 
     item_selected = Signal(str)
 
@@ -119,32 +163,83 @@ class FluentAutoCompleteEdit(QLineEdit):
 
         self._suggestions = suggestions or []
         self._filtered_suggestions = []
+        self._setup_animations()
         self._setup_completer()
         self._setup_style()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
+    def _setup_animations(self):
+        """Setup enhanced animation system"""
+        # Setup state transitions
+        self._state_transition = FluentStateTransition(self)
+
+        self._state_transition.addState("normal", {
+            "minimumWidth": 200,
+        })
+
+        self._state_transition.addState("active", {
+            "minimumWidth": 220,
+        }, duration=200, easing=FluentTransition.EASE_SMOOTH)
+
+        # Entrance animation
+        QTimer.singleShot(75, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation with staggered effects"""
+        entrance_sequence = FluentSequence(self)
+
+        # Slide in from right
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.slide_in(self, 250, "right"))
+        entrance_sequence.addPause(100)
+
+        # Subtle scale effect
+        entrance_sequence.addCallback(
+            lambda: FluentMicroInteraction.pulse_animation(self, scale=1.02))
+
+        entrance_sequence.start()
+
+    def focusInEvent(self, event):
+        """Enhanced focus in event"""
+        super().focusInEvent(event)
+        self._state_transition.transitionTo("active")
+
+        # Animate completer popup if available
+        if self.completer() and self.completer().popup():
+            FluentRevealEffect.fade_in(self.completer().popup(), 150)
+
+    def focusOutEvent(self, event):
+        """Enhanced focus out event"""
+        super().focusOutEvent(event)
+        self._state_transition.transitionTo("normal")
+
     def setSuggestions(self, suggestions: List[str]):
-        """Set suggestion list"""
+        """Set suggestion list with animation feedback"""
         self._suggestions = suggestions
         self._setup_completer()
+        # Add subtle feedback for suggestion update
+        FluentMicroInteraction.pulse_animation(self, scale=1.01)
 
     def addSuggestion(self, suggestion: str):
-        """Add a suggestion"""
+        """Add a suggestion with animation"""
         if suggestion not in self._suggestions:
             self._suggestions.append(suggestion)
             self._setup_completer()
+            # Subtle pulse to indicate addition
+            FluentMicroInteraction.pulse_animation(self, scale=1.01)
 
     def _setup_completer(self):
-        """Setup auto-completer"""
+        """Setup auto-completer with enhanced popup styling"""
         if self._suggestions:
             model = QStringListModel(self._suggestions)
             completer = QCompleter(model)
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             completer.setFilterMode(Qt.MatchFlag.MatchContains)
 
-            # Style the completer popup
-            completer.popup().setStyleSheet(f"""
+            # Style the completer popup with animations
+            popup = completer.popup()
+            popup.setStyleSheet(f"""
                 QListView {{
                     background-color: {theme_manager.get_color('surface').name()};
                     border: 1px solid {theme_manager.get_color('border').name()};
@@ -163,8 +258,15 @@ class FluentAutoCompleteEdit(QLineEdit):
                 }}
             """)
 
-            completer.activated.connect(self.item_selected.emit)
+            # Add selection animation
+            completer.activated.connect(self._on_item_selected)
             self.setCompleter(completer)
+
+    def _on_item_selected(self, text: str):
+        """Handle item selection with animation"""
+        # Pulse animation for selection feedback
+        FluentMicroInteraction.pulse_animation(self, scale=1.03)
+        self.item_selected.emit(text)
 
     def _setup_style(self):
         """Setup style"""
@@ -198,17 +300,62 @@ class FluentAutoCompleteEdit(QLineEdit):
 
 
 class FluentRichTextEditor(QWidget):
-    """Fluent Design style rich text editor"""
+    """Fluent Design style rich text editor with enhanced animations"""
 
     text_changed = Signal(str)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
+        self._setup_animations()
         self._setup_ui()
         self._setup_style()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _setup_animations(self):
+        """Setup enhanced animation system"""
+        # Setup state transitions
+        self._state_transition = FluentStateTransition(self)
+
+        self._state_transition.addState("normal", {
+            "minimumHeight": 200,
+        })
+
+        self._state_transition.addState("expanded", {
+            "minimumHeight": 220,
+        }, duration=300, easing=FluentTransition.EASE_SPRING)
+
+        # Toolbar button animations
+        self._button_animations = {}
+
+        # Entrance animation
+        QTimer.singleShot(100, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation with staggered toolbar buttons"""
+        entrance_sequence = FluentSequence(self)
+
+        # Fade in the editor first
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.fade_in(self, 300))
+        entrance_sequence.addPause(100)
+
+        # Animate toolbar buttons with stagger
+        entrance_sequence.addCallback(
+            lambda: self._animate_toolbar_buttons())
+
+        entrance_sequence.start()
+
+    def _animate_toolbar_buttons(self):
+        """Animate toolbar buttons with staggered reveals"""
+        buttons = [self.bold_btn, self.italic_btn,
+                   self.underline_btn, self.font_size_combo]
+
+        for i, button in enumerate(buttons):
+            delay = i * 50
+            QTimer.singleShot(
+                delay, lambda b=button: FluentRevealEffect.slide_in(b, 150, "up"))
 
     def _setup_ui(self):
         """Setup UI"""
@@ -223,28 +370,40 @@ class FluentRichTextEditor(QWidget):
         toolbar_layout.setContentsMargins(8, 4, 8, 4)
         toolbar_layout.setSpacing(4)
 
-        # Bold button
+        # Bold button with enhanced interaction
         self.bold_btn = QPushButton("B")
         self.bold_btn.setFixedSize(28, 28)
         self.bold_btn.setCheckable(True)
         self.bold_btn.setFont(QFont("", 10, QFont.Weight.Bold))
         self.bold_btn.clicked.connect(self._toggle_bold)
+        # Add micro-interaction
+        self.bold_btn.mousePressEvent = lambda e: self._handle_button_press(
+            self.bold_btn, e, self._toggle_bold_original)
 
-        # Italic button
+        # Italic button with enhanced interaction
         self.italic_btn = QPushButton("I")
         self.italic_btn.setFixedSize(28, 28)
         self.italic_btn.setCheckable(True)
         self.italic_btn.setFont(QFont("", 10, QFont.Weight.Normal))
         self.italic_btn.clicked.connect(self._toggle_italic)
+        self.italic_btn.mousePressEvent = lambda e: self._handle_button_press(
+            self.italic_btn, e, self._toggle_italic_original)
 
-        # Underline button
+        # Underline button with enhanced interaction
         self.underline_btn = QPushButton("U")
         self.underline_btn.setFixedSize(28, 28)
         self.underline_btn.setCheckable(True)
         self.underline_btn.setFont(QFont("", 10, QFont.Weight.Normal))
         self.underline_btn.clicked.connect(self._toggle_underline)
+        self.underline_btn.mousePressEvent = lambda e: self._handle_button_press(
+            self.underline_btn, e, self._toggle_underline_original)
 
-        # Font size combo
+        # Store original methods for proper chaining
+        self._toggle_bold_original = self.bold_btn.mousePressEvent
+        self._toggle_italic_original = self.italic_btn.mousePressEvent
+        self._toggle_underline_original = self.underline_btn.mousePressEvent
+
+        # Font size combo with enhanced styling
         self.font_size_combo = QComboBox()
         self.font_size_combo.addItems(
             ["8", "10", "12", "14", "16", "18", "20", "24"])
@@ -259,33 +418,60 @@ class FluentRichTextEditor(QWidget):
         toolbar_layout.addWidget(self.font_size_combo)
         toolbar_layout.addStretch()
 
-        # Text editor
+        # Text editor with enhanced focus handling
         self.text_edit = QTextEdit()
         self.text_edit.textChanged.connect(self._on_text_changed)
+        self.text_edit.focusInEvent = self._text_focus_in
+        self.text_edit.focusOutEvent = self._text_focus_out
 
         layout.addWidget(self.toolbar)
         layout.addWidget(self.text_edit)
 
+    def _handle_button_press(self, button, event, original_handler):
+        """Handle button press with micro-interaction"""
+        # Call original handler
+        original_handler(event)
+        # Add micro-interaction
+        FluentMicroInteraction.button_press(button, scale=0.90)
+
+    def _text_focus_in(self, event):
+        """Enhanced text editor focus in"""
+        QTextEdit.focusInEvent(self.text_edit, event)
+        self._state_transition.transitionTo("expanded")
+
+    def _text_focus_out(self, event):
+        """Enhanced text editor focus out"""
+        QTextEdit.focusOutEvent(self.text_edit, event)
+        self._state_transition.transitionTo("normal")
+
     def _toggle_bold(self):
-        """Toggle bold formatting"""
+        """Toggle bold formatting with animation"""
         if self.bold_btn.isChecked():
             self.text_edit.setFontWeight(QFont.Weight.Bold)
         else:
             self.text_edit.setFontWeight(QFont.Weight.Normal)
 
+        # Add visual feedback
+        FluentMicroInteraction.pulse_animation(self.bold_btn, scale=1.1)
+
     def _toggle_italic(self):
-        """Toggle italic formatting"""
+        """Toggle italic formatting with animation"""
         self.text_edit.setFontItalic(self.italic_btn.isChecked())
+        FluentMicroInteraction.pulse_animation(self.italic_btn, scale=1.1)
 
     def _toggle_underline(self):
-        """Toggle underline formatting"""
+        """Toggle underline formatting with animation"""
         self.text_edit.setFontUnderline(self.underline_btn.isChecked())
+        FluentMicroInteraction.pulse_animation(self.underline_btn, scale=1.1)
 
     def _change_font_size(self, size_text: str):
-        """Change font size"""
+        """Change font size with animation"""
         try:
             size = int(size_text)
             self.text_edit.setFontPointSize(size)
+            # Add subtle scale feedback
+            FluentMicroInteraction.scale_animation(
+                self.font_size_combo, scale=1.05)
         except ValueError:
             pass
 
@@ -302,12 +488,14 @@ class FluentRichTextEditor(QWidget):
         return self.text_edit.toHtml()
 
     def setText(self, text: str):
-        """Set plain text"""
+        """Set plain text with animation"""
         self.text_edit.setPlainText(text)
+        FluentMicroInteraction.pulse_animation(self.text_edit, scale=1.01)
 
     def setHtml(self, html: str):
-        """Set HTML text"""
+        """Set HTML text with animation"""
         self.text_edit.setHtml(html)
+        FluentMicroInteraction.pulse_animation(self.text_edit, scale=1.01)
 
     def _setup_style(self):
         """Setup style"""
@@ -381,7 +569,7 @@ class FluentRichTextEditor(QWidget):
 
 
 class FluentDateTimePicker(QWidget):
-    """Fluent Design style date/time picker"""
+    """Fluent Design style date/time picker with enhanced animations"""
 
     date_changed = Signal(QDate)
     time_changed = Signal(QTime)
@@ -396,10 +584,47 @@ class FluentDateTimePicker(QWidget):
         super().__init__(parent)
 
         self._mode = mode
+        self._setup_animations()
         self._setup_ui()
         self._setup_style()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _setup_animations(self):
+        """Setup enhanced animation system"""
+        # Setup state transitions
+        self._state_transition = FluentStateTransition(self)
+
+        self._state_transition.addState("normal", {
+            "minimumHeight": 35,
+        })
+
+        self._state_transition.addState("expanded", {
+            "minimumHeight": 40,
+        }, duration=200, easing=FluentTransition.EASE_SMOOTH)
+
+        # Entrance animation
+        QTimer.singleShot(125, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation with staggered components"""
+        entrance_sequence = FluentSequence(self)
+
+        # Fade in the container
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.fade_in(self, 250))
+        entrance_sequence.addPause(50)
+
+        # Animate individual components based on mode
+        if hasattr(self, 'date_edit'):
+            entrance_sequence.addCallback(
+                lambda: FluentRevealEffect.slide_in(self.date_edit, 150, "left"))
+
+        if hasattr(self, 'time_edit'):
+            entrance_sequence.addCallback(
+                lambda: FluentRevealEffect.slide_in(self.time_edit, 150, "right"))
+
+        entrance_sequence.start()
 
     def _setup_ui(self):
         """Setup UI"""
@@ -412,23 +637,63 @@ class FluentDateTimePicker(QWidget):
             self.date_edit.setDate(QDate.currentDate())
             self.date_edit.setCalendarPopup(True)
             self.date_edit.dateChanged.connect(self._on_date_changed)
+
+            # Add enhanced interaction for date edit
+            self.date_edit.focusInEvent = lambda e: self._date_focus_in(e)
+            self.date_edit.focusOutEvent = lambda e: self._date_focus_out(e)
+
             layout.addWidget(self.date_edit)
 
         if self._mode in [self.PickerMode.TIME_ONLY, self.PickerMode.DATETIME]:
             self.time_edit = QTimeEdit()
             self.time_edit.setTime(QTime.currentTime())
             self.time_edit.timeChanged.connect(self._on_time_changed)
+
+            # Add enhanced interaction for time edit
+            self.time_edit.focusInEvent = lambda e: self._time_focus_in(e)
+            self.time_edit.focusOutEvent = lambda e: self._time_focus_out(e)
+
             layout.addWidget(self.time_edit)
 
+    def _date_focus_in(self, event):
+        """Enhanced date edit focus in"""
+        QDateEdit.focusInEvent(self.date_edit, event)
+        self._state_transition.transitionTo("expanded")
+        FluentMicroInteraction.hover_glow(self.date_edit, intensity=0.1)
+
+    def _date_focus_out(self, event):
+        """Enhanced date edit focus out"""
+        QDateEdit.focusOutEvent(self.date_edit, event)
+        self._state_transition.transitionTo("normal")
+
+    def _time_focus_in(self, event):
+        """Enhanced time edit focus in"""
+        QTimeEdit.focusInEvent(self.time_edit, event)
+        self._state_transition.transitionTo("expanded")
+        FluentMicroInteraction.hover_glow(self.time_edit, intensity=0.1)
+
+    def _time_focus_out(self, event):
+        """Enhanced time edit focus out"""
+        QTimeEdit.focusOutEvent(self.time_edit, event)
+        self._state_transition.transitionTo("normal")
+
     def _on_date_changed(self, date: QDate):
-        """Handle date change"""
+        """Handle date change with animation"""
+        # Add pulse feedback for date change
+        if hasattr(self, 'date_edit'):
+            FluentMicroInteraction.pulse_animation(self.date_edit, scale=1.02)
+
         self.date_changed.emit(date)
         if hasattr(self, 'time_edit'):
             datetime = QDateTime(date, self.time_edit.time())
             self.datetime_changed.emit(datetime)
 
     def _on_time_changed(self, time: QTime):
-        """Handle time change"""
+        """Handle time change with animation"""
+        # Add pulse feedback for time change
+        if hasattr(self, 'time_edit'):
+            FluentMicroInteraction.pulse_animation(self.time_edit, scale=1.02)
+
         self.time_changed.emit(time)
         if hasattr(self, 'date_edit'):
             datetime = QDateTime(self.date_edit.date(), time)
@@ -457,21 +722,33 @@ class FluentDateTimePicker(QWidget):
         return QDateTime()
 
     def setDate(self, date: QDate):
-        """Set date"""
+        """Set date with animation"""
         if hasattr(self, 'date_edit'):
             self.date_edit.setDate(date)
+            FluentMicroInteraction.pulse_animation(self.date_edit, scale=1.02)
 
     def setTime(self, time: QTime):
-        """Set time"""
+        """Set time with animation"""
         if hasattr(self, 'time_edit'):
             self.time_edit.setTime(time)
+            FluentMicroInteraction.pulse_animation(self.time_edit, scale=1.02)
 
     def setDateTime(self, datetime: QDateTime):
-        """Set datetime"""
+        """Set datetime with coordinated animation"""
+        entrance_sequence = FluentSequence(self)
+
         if hasattr(self, 'date_edit'):
-            self.date_edit.setDate(datetime.date())
+            entrance_sequence.addCallback(
+                lambda: (self.date_edit.setDate(datetime.date()),
+                         FluentMicroInteraction.pulse_animation(self.date_edit, scale=1.02)))
+
         if hasattr(self, 'time_edit'):
-            self.time_edit.setTime(datetime.time())
+            entrance_sequence.addPause(50)
+            entrance_sequence.addCallback(
+                lambda: (self.time_edit.setTime(datetime.time()),
+                         FluentMicroInteraction.pulse_animation(self.time_edit, scale=1.02)))
+
+        entrance_sequence.start()
 
     def _setup_style(self):
         """Setup style"""
@@ -525,7 +802,7 @@ class FluentDateTimePicker(QWidget):
 
 
 class FluentSlider(QWidget):
-    """Fluent Design style slider with value display"""
+    """Fluent Design style slider with value display and enhanced animations"""
 
     value_changed = Signal(int)
 
@@ -537,10 +814,49 @@ class FluentSlider(QWidget):
         self._show_value = True
         self._show_ticks = True
 
+        self._setup_animations()
         self._setup_ui()
         self._setup_style()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _setup_animations(self):
+        """Setup enhanced animation system"""
+        # Setup state transitions
+        self._state_transition = FluentStateTransition(self)
+
+        if self._orientation == Qt.Orientation.Horizontal:
+            self._state_transition.addState("normal", {
+                "minimumHeight": 60,
+            })
+            self._state_transition.addState("active", {
+                "minimumHeight": 70,
+            }, duration=200, easing=FluentTransition.EASE_SMOOTH)
+        else:
+            self._state_transition.addState("normal", {
+                "minimumWidth": 60,
+            })
+            self._state_transition.addState("active", {
+                "minimumWidth": 70,
+            }, duration=200, easing=FluentTransition.EASE_SMOOTH)
+
+        # Entrance animation
+        QTimer.singleShot(150, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation"""
+        entrance_sequence = FluentSequence(self)
+
+        # Slide in the slider
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.slide_in(self.slider, 200, "up"))
+        entrance_sequence.addPause(100)
+
+        # Fade in the value label
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.fade_in(self.value_label, 150))
+
+        entrance_sequence.start()
 
     def _setup_ui(self):
         """Setup UI"""
@@ -557,6 +873,10 @@ class FluentSlider(QWidget):
         self.slider.setValue(50)
         self.slider.valueChanged.connect(self._on_value_changed)
 
+        # Add enhanced interaction for slider
+        self.slider.mousePressEvent = lambda e: self._slider_press(e)
+        self.slider.mouseReleaseEvent = lambda e: self._slider_release(e)
+
         self.value_label = QLabel("50")
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.value_label.setMinimumWidth(40)
@@ -568,23 +888,44 @@ class FluentSlider(QWidget):
             layout.addWidget(self.value_label)
             layout.addWidget(self.slider)
 
+    def _slider_press(self, event):
+        """Enhanced slider press event"""
+        QSlider.mousePressEvent(self.slider, event)
+        self._state_transition.transitionTo("active")
+        FluentMicroInteraction.button_press(self.slider, scale=0.98)
+
+    def _slider_release(self, event):
+        """Enhanced slider release event"""
+        QSlider.mouseReleaseEvent(self.slider, event)
+        self._state_transition.transitionTo("normal")
+
     def _on_value_changed(self, value: int):
-        """Handle value change"""
+        """Handle value change with animation"""
         if self._show_value:
+            # Animate value label update
+            FluentMicroInteraction.pulse_animation(self.value_label, scale=1.1)
             self.value_label.setText(str(value))
+
         self.value_changed.emit(value)
 
     def setValue(self, value: int):
-        """Set slider value"""
+        """Set slider value with animation"""
         self.slider.setValue(value)
+        FluentMicroInteraction.pulse_animation(self.slider, scale=1.02)
 
     def setRange(self, minimum: int, maximum: int):
-        """Set value range"""
+        """Set value range with animation feedback"""
         self.slider.setRange(minimum, maximum)
+        FluentMicroInteraction.scale_animation(self.slider, scale=1.01)
 
     def setShowValue(self, show: bool):
-        """Set value display visibility"""
+        """Set value display visibility with animation"""
         self._show_value = show
+        if show:
+            FluentRevealEffect.fade_in(self.value_label, 200)
+        else:
+            # Could use fade_out if available
+            FluentRevealEffect.fade_in(self.value_label, 200)
         self.value_label.setVisible(show)
 
     def value(self) -> int:
@@ -651,7 +992,7 @@ class FluentSlider(QWidget):
 
 
 class FluentFileSelector(QWidget):
-    """Fluent Design style file selector"""
+    """Fluent Design style file selector with enhanced animations"""
 
     file_selected = Signal(str)  # file_path
     files_selected = Signal(list)  # file_paths
@@ -664,10 +1005,47 @@ class FluentFileSelector(QWidget):
         self._file_filter = file_filter
         self._selected_files = []
 
+        self._setup_animations()
         self._setup_ui()
         self._setup_style()
 
         theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _setup_animations(self):
+        """Setup enhanced animation system"""
+        # Setup state transitions
+        self._state_transition = FluentStateTransition(self)
+
+        self._state_transition.addState("normal", {
+            "minimumHeight": 40,
+        })
+
+        self._state_transition.addState("active", {
+            "minimumHeight": 45,
+        }, duration=200, easing=FluentTransition.EASE_SMOOTH)
+
+        # Entrance animation
+        QTimer.singleShot(175, self._show_entrance_animation)
+
+    def _show_entrance_animation(self):
+        """Show entrance animation with staggered components"""
+        entrance_sequence = FluentSequence(self)
+
+        # Slide in file display
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.slide_in(self.file_display, 200, "left"))
+        entrance_sequence.addPause(50)
+
+        # Slide in browse button
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.slide_in(self.browse_btn, 150, "up"))
+        entrance_sequence.addPause(50)
+
+        # Slide in clear button
+        entrance_sequence.addCallback(
+            lambda: FluentRevealEffect.slide_in(self.clear_btn, 150, "down"))
+
+        entrance_sequence.start()
 
     def _setup_ui(self):
         """Setup UI"""
@@ -682,18 +1060,31 @@ class FluentFileSelector(QWidget):
         self.browse_btn = QPushButton("Browse...")
         self.browse_btn.setFixedWidth(80)
         self.browse_btn.clicked.connect(self._browse_files)
+        # Add micro-interaction
+        self.browse_btn.mousePressEvent = lambda e: self._handle_button_press(
+            self.browse_btn, e)
 
         self.clear_btn = QPushButton("Clear")
         self.clear_btn.setFixedWidth(60)
         self.clear_btn.clicked.connect(self._clear_selection)
         self.clear_btn.setEnabled(False)
+        # Add micro-interaction
+        self.clear_btn.mousePressEvent = lambda e: self._handle_button_press(
+            self.clear_btn, e)
 
         layout.addWidget(self.file_display)
         layout.addWidget(self.browse_btn)
         layout.addWidget(self.clear_btn)
 
+    def _handle_button_press(self, button, event):
+        """Handle button press with micro-interaction"""
+        QPushButton.mousePressEvent(button, event)
+        FluentMicroInteraction.button_press(button, scale=0.92)
+
     def _browse_files(self):
-        """Browse for files"""
+        """Browse for files with animation feedback"""
+        self._state_transition.transitionTo("active")
+
         if self._multi_select:
             files, _ = QFileDialog.getOpenFileNames(
                 self, "Select Files", "", self._file_filter)
@@ -701,6 +1092,12 @@ class FluentFileSelector(QWidget):
                 self._selected_files = files
                 self.file_display.setText(f"{len(files)} files selected")
                 self.clear_btn.setEnabled(True)
+
+                # Animation feedback
+                FluentMicroInteraction.pulse_animation(
+                    self.file_display, scale=1.02)
+                FluentRevealEffect.fade_in(self.clear_btn, 150)
+
                 self.files_selected.emit(files)
         else:
             file, _ = QFileDialog.getOpenFileName(
@@ -710,10 +1107,34 @@ class FluentFileSelector(QWidget):
                 self.file_display.setText(
                     file.split('/')[-1])  # Show filename only
                 self.clear_btn.setEnabled(True)
+
+                # Animation feedback
+                FluentMicroInteraction.pulse_animation(
+                    self.file_display, scale=1.02)
+                FluentRevealEffect.fade_in(self.clear_btn, 150)
+
                 self.file_selected.emit(file)
 
+        QTimer.singleShot(
+            300, lambda: self._state_transition.transitionTo("normal"))
+
     def _clear_selection(self):
-        """Clear file selection"""
+        """Clear file selection with animation"""
+        # Animate clearing
+        clear_sequence = FluentSequence(self)
+
+        # Pulse the display field
+        clear_sequence.addCallback(
+            lambda: FluentMicroInteraction.pulse_animation(self.file_display, scale=0.95))
+        clear_sequence.addPause(100)
+
+        # Clear and reset
+        clear_sequence.addCallback(self._perform_clear)
+
+        clear_sequence.start()
+
+    def _perform_clear(self):
+        """Perform the actual clearing"""
         self._selected_files = []
         self.file_display.clear()
         self.file_display.setPlaceholderText("No file selected")

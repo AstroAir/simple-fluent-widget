@@ -30,8 +30,8 @@ class FluentTransition:
 
     @staticmethod
     def create_transition(widget: QWidget, transition_type: str,
-                         duration: int = FluentAnimation.DURATION_MEDIUM,
-                         easing: QEasingCurve.Type = EASE_SMOOTH) -> QPropertyAnimation:
+                          duration: int = FluentAnimation.DURATION_MEDIUM,
+                          easing: QEasingCurve.Type = EASE_SMOOTH) -> QPropertyAnimation:
         """Create a transition animation"""
 
         if transition_type == FluentTransition.FADE:
@@ -47,13 +47,13 @@ class FluentTransition:
 
     @staticmethod
     def _create_fade_transition(widget: QWidget, duration: int,
-                               easing: QEasingCurve.Type) -> QPropertyAnimation:
+                                easing: QEasingCurve.Type) -> QPropertyAnimation:
         """Create fade transition"""
         effect = widget.graphicsEffect()
         if not isinstance(effect, QGraphicsOpacityEffect):
             effect = QGraphicsOpacityEffect(widget)
             widget.setGraphicsEffect(effect)
-        
+
         animation = QPropertyAnimation(effect, QByteArray(b"opacity"))
         animation.setDuration(duration)
         animation.setEasingCurve(easing)
@@ -61,7 +61,7 @@ class FluentTransition:
 
     @staticmethod
     def _create_scale_transition(widget: QWidget, duration: int,
-                                easing: QEasingCurve.Type) -> QPropertyAnimation:
+                                 easing: QEasingCurve.Type) -> QPropertyAnimation:
         """Create scale transition"""
         animation = QPropertyAnimation(widget, QByteArray(b"geometry"))
         animation.setDuration(duration)
@@ -70,7 +70,7 @@ class FluentTransition:
 
     @staticmethod
     def _create_slide_transition(widget: QWidget, duration: int,
-                                easing: QEasingCurve.Type) -> QPropertyAnimation:
+                                 easing: QEasingCurve.Type) -> QPropertyAnimation:
         """Create slide transition"""
         animation = QPropertyAnimation(widget, QByteArray(b"pos"))
         animation.setDuration(duration)
@@ -79,13 +79,13 @@ class FluentTransition:
 
     @staticmethod
     def _create_blur_transition(widget: QWidget, duration: int,
-                               easing: QEasingCurve.Type) -> QPropertyAnimation:
+                                easing: QEasingCurve.Type) -> QPropertyAnimation:
         """Create blur transition"""
         effect = widget.graphicsEffect()
         if not isinstance(effect, QGraphicsBlurEffect):
             effect = QGraphicsBlurEffect(widget)
             widget.setGraphicsEffect(effect)
-        
+
         animation = QPropertyAnimation(effect, QByteArray(b"blurRadius"))
         animation.setDuration(duration)
         animation.setEasingCurve(easing)
@@ -98,13 +98,11 @@ class FluentSequence(QObject):
     finished = Signal()
     _dummy_value_internal: int = 0
 
-
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._sequence = QSequentialAnimationGroup()
         self._sequence.finished.connect(self.finished)
         self._dummy_value_internal = 0
-
 
     def addAnimation(self, animation: QPropertyAnimation):
         """Add animation to sequence"""
@@ -115,7 +113,6 @@ class FluentSequence(QObject):
         # QSequentialAnimationGroup has a addPause method
         self._sequence.addPause(duration)
 
-
     def addCallback(self, callback: Callable):
         """Add callback function to sequence"""
         # Create a dummy animation that triggers callback when finished
@@ -125,14 +122,16 @@ class FluentSequence(QObject):
         # A more robust way is to use QTimer.singleShot(0, callback) if the timing is not critical
         # or to subclass QAbstractAnimation for precise callback timing.
         # The current approach of a 1ms dummy animation is acceptable for many cases.
-        dummy = QPropertyAnimation(self) # Dummy animation needs a QObject target
-        dummy.setDuration(1) # Minimal duration
-        dummy.setPropertyName(QByteArray(b"dummy_value")) # Property name for animation
+        # Dummy animation needs a QObject target
+        dummy = QPropertyAnimation(self)
+        dummy.setDuration(1)  # Minimal duration
+        # Property name for animation
+        dummy.setPropertyName(QByteArray(b"dummy_value"))
         dummy.setStartValue(0)
         dummy.setEndValue(1)
         dummy.finished.connect(callback)
         self._sequence.addAnimation(dummy)
-    
+
     # Dummy property for the callback animation
     def get_dummy_value(self) -> int:
         return self._dummy_value_internal
@@ -141,8 +140,8 @@ class FluentSequence(QObject):
         self._dummy_value_internal = value
 
     # Define the Qt property using the getter and setter
-    dummy_value = Property(int, get_dummy_value, set_dummy_value) # type: ignore
-
+    dummy_value = Property(int, get_dummy_value,
+                           set_dummy_value)  # type: ignore
 
     def start(self):
         """Start the sequence"""
@@ -211,10 +210,12 @@ class FluentMicroInteraction:
         release_anim.setEndValue(original_rect)
 
         # Sequence
-        sequence = QSequentialAnimationGroup(button) # Set parent for auto-deletion
+        sequence = QSequentialAnimationGroup(
+            button)  # Set parent for auto-deletion
         sequence.addAnimation(press_anim)
         sequence.addAnimation(release_anim)
-        sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped) # Ensure it's deleted after running
+        # Ensure it's deleted after running
+        sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
         return sequence
 
@@ -229,8 +230,9 @@ class FluentMicroInteraction:
         glow_in = QPropertyAnimation(effect, QByteArray(b"opacity"))
         glow_in.setDuration(FluentAnimation.DURATION_FAST)
         glow_in.setEasingCurve(FluentTransition.EASE_SMOOTH)
-        glow_in.setStartValue(1.0) # Assuming current opacity is 1.0
-        glow_in.setEndValue(min(1.0, 1.0 + intensity if intensity >= 0 else 1.0 - abs(intensity))) # Clamp opacity
+        glow_in.setStartValue(1.0)  # Assuming current opacity is 1.0
+        glow_in.setEndValue(min(1.0, 1.0 + intensity if intensity >=
+                            0 else 1.0 - abs(intensity)))  # Clamp opacity
 
         return glow_in
 
@@ -298,22 +300,26 @@ class FluentMicroInteraction:
             right_anim = QPropertyAnimation(widget, QByteArray(b"pos"))
             right_anim.setDuration(50)
             right_anim.setStartValue(original_pos)
-            right_anim.setEndValue(QPoint(original_pos.x() + int(intensity), original_pos.y()))
+            right_anim.setEndValue(
+                QPoint(original_pos.x() + int(intensity), original_pos.y()))
             right_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
             sequence.addAnimation(right_anim)
 
             # Move left
             left_anim = QPropertyAnimation(widget, QByteArray(b"pos"))
             left_anim.setDuration(50)
-            left_anim.setStartValue(QPoint(original_pos.x() + int(intensity), original_pos.y()))
-            left_anim.setEndValue(QPoint(original_pos.x() - int(intensity), original_pos.y()))
+            left_anim.setStartValue(
+                QPoint(original_pos.x() + int(intensity), original_pos.y()))
+            left_anim.setEndValue(
+                QPoint(original_pos.x() - int(intensity), original_pos.y()))
             left_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
             sequence.addAnimation(left_anim)
 
             # Return to center
             center_anim = QPropertyAnimation(widget, QByteArray(b"pos"))
             center_anim.setDuration(50)
-            center_anim.setStartValue(QPoint(original_pos.x() - int(intensity), original_pos.y()))
+            center_anim.setStartValue(
+                QPoint(original_pos.x() - int(intensity), original_pos.y()))
             center_anim.setEndValue(original_pos)
             center_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
             sequence.addAnimation(center_anim)
@@ -362,7 +368,7 @@ class FluentMicroInteraction:
         return_anim.setStartValue(expanded_rect)
         return_anim.setEndValue(original_rect)
 
-        sequence = QSequentialAnimationGroup(widget) # Set parent
+        sequence = QSequentialAnimationGroup(widget)  # Set parent
         sequence.addAnimation(ripple_anim)
         sequence.addAnimation(return_anim)
         sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
@@ -375,7 +381,8 @@ class FluentStateTransition:
 
     def __init__(self, widget: QWidget):
         self.widget = widget
-        self._state_animations: Dict[str, QParallelAnimationGroup] = {} # Changed type to QParallelAnimationGroup
+        # Changed type to QParallelAnimationGroup
+        self._state_animations: Dict[str, QParallelAnimationGroup] = {}
         self._current_state = "default"
 
     def addState(self, state_name: str, properties: Dict[str, Any],
@@ -398,7 +405,6 @@ class FluentStateTransition:
             # else:
                 # print(f"Warning: Property '{prop_name}' not found on widget {self.widget}")
 
-
         self._state_animations[state_name] = animations
 
     def transitionTo(self, state_name: str):
@@ -407,7 +413,8 @@ class FluentStateTransition:
             # Stop any currently running animation for this group before starting a new one
             # This might involve managing the groups more carefully if states can interrupt each other.
             # For now, just start the new one.
-            self._state_animations[state_name].start(QAbstractAnimation.DeletionPolicy.KeepWhenStopped) # Keep so it can be restarted
+            self._state_animations[state_name].start(
+                QAbstractAnimation.DeletionPolicy.KeepWhenStopped)  # Keep so it can be restarted
             self._current_state = state_name
 
     def getCurrentState(self) -> str:
@@ -487,19 +494,46 @@ class FluentRevealEffect:
         reveal_anim = QPropertyAnimation(widget, QByteArray(b"pos"))
         reveal_anim.setDuration(FluentAnimation.DURATION_MEDIUM)
         reveal_anim.setEasingCurve(FluentTransition.EASE_SPRING)
-        reveal_anim.setStartValue(start_pos) # Set start value
+        reveal_anim.setStartValue(start_pos)  # Set start value
         reveal_anim.setEndValue(original_pos)
 
         if delay > 0:
             # Use a QTimer associated with the widget to ensure it's managed
             timer = QTimer(widget)
             timer.setSingleShot(True)
-            timer.timeout.connect(lambda: reveal_anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped))
+            timer.timeout.connect(lambda: reveal_anim.start(
+                QAbstractAnimation.DeletionPolicy.DeleteWhenStopped))
             timer.start(delay)
         else:
-            reveal_anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            reveal_anim.start(
+                QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
         return reveal_anim
+
+    @staticmethod
+    def reveal_fade(widget: QWidget, duration: int,
+                    start_value: float = 0.0, end_value: float = 1.0,
+                    easing_curve_type: QEasingCurve.Type = FluentTransition.EASE_SMOOTH):
+        """
+        Applies a fade-in reveal effect to the widget.
+        The animation is started immediately and will be deleted when stopped.
+        """
+        opacity_effect = widget.graphicsEffect()
+        if not isinstance(opacity_effect, QGraphicsOpacityEffect):
+            opacity_effect = QGraphicsOpacityEffect(
+                widget)  # Parent effect to widget
+            widget.setGraphicsEffect(opacity_effect)
+
+        opacity_effect.setOpacity(start_value)  # Set initial opacity
+
+        animation = QPropertyAnimation(opacity_effect, QByteArray(
+            b"opacity"), widget)  # Parent animation to widget
+        animation.setDuration(duration)
+        animation.setStartValue(start_value)
+        animation.setEndValue(end_value)
+        animation.setEasingCurve(easing_curve_type)
+
+        animation.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
     @staticmethod
     def reveal_scale(widget: QWidget, delay: int = 0) -> QPropertyAnimation:
@@ -516,23 +550,25 @@ class FluentRevealEffect:
         scale_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
         scale_anim.setDuration(FluentAnimation.DURATION_MEDIUM)
         scale_anim.setEasingCurve(FluentTransition.EASE_SPRING)
-        scale_anim.setStartValue(start_rect) # Set start value
+        scale_anim.setStartValue(start_rect)  # Set start value
         scale_anim.setEndValue(original_rect)
 
         if delay > 0:
             timer = QTimer(widget)
             timer.setSingleShot(True)
-            timer.timeout.connect(lambda: scale_anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped))
+            timer.timeout.connect(lambda: scale_anim.start(
+                QAbstractAnimation.DeletionPolicy.DeleteWhenStopped))
             timer.start(delay)
         else:
-            scale_anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            scale_anim.start(
+                QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
         return scale_anim
 
     @staticmethod
     def staggered_reveal(widgets: List[QWidget], stagger_delay: int = 100) -> QParallelAnimationGroup:
         """Reveal multiple widgets with staggered timing"""
-        animations_group = QParallelAnimationGroup() # Manage all animations
+        animations_group = QParallelAnimationGroup()  # Manage all animations
 
         for i, widget in enumerate(widgets):
             delay = i * stagger_delay
@@ -557,13 +593,14 @@ class FluentRevealEffect:
             # For now, just calling them.
             anim_up = FluentRevealEffect.reveal_up(widget, delay)
             # anim_scale = FluentRevealEffect.reveal_scale(widget, delay) # Example if using scale
-            
+
             # If reveal_up/reveal_scale returned animations that weren't auto-started,
             # you could add them to the group:
             # animations_group.addAnimation(anim_up)
 
         # If a controllable group is needed, the reveal methods should be refactored.
-        return animations_group # Return the group, it might be empty or used differently in future
+        # Return the group, it might be empty or used differently in future
+        return animations_group
 
 
 class FluentLayoutTransition:
@@ -571,13 +608,14 @@ class FluentLayoutTransition:
 
     @staticmethod
     def animate_layout_change(container: QWidget,
-                             duration: int = FluentAnimation.DURATION_MEDIUM):
+                              duration: int = FluentAnimation.DURATION_MEDIUM):
         """Animate layout changes in container"""
         original_geometries = {}
-        
+
         layout = container.layout()
         if not layout:
-            return QParallelAnimationGroup(container) # Return an empty group if no layout
+            # Return an empty group if no layout
+            return QParallelAnimationGroup(container)
 
         # Iterate over direct children only
         for i in range(layout.count()):
@@ -631,8 +669,9 @@ class FluentLayoutTransition:
         # Store original positions
         temp_original_positions: Dict[QWidget, QRect] = {}
         children_to_animate: List[QWidget] = []
-        
-        current_layout = container.layout() # Re-fetch in case it changed, or use 'layout' from above
+
+        # Re-fetch in case it changed, or use 'layout' from above
+        current_layout = container.layout()
         if current_layout:
             for i in range(current_layout.count()):
                 item = current_layout.itemAt(i)
@@ -645,8 +684,8 @@ class FluentLayoutTransition:
                     # temp_original_positions should ideally be passed in or captured
                     # truly before the event that *causes* the layout change.
                     # The current `original_geometries` capture might be what we need if called at the right time.
-                    temp_original_positions[child] = original_geometries.get(child, child.geometry())
-
+                    temp_original_positions[child] = original_geometries.get(
+                        child, child.geometry())
 
         # Simulate layout update (or assume it happened just before calling this)
         # If this function is responsible for triggering the layout update that needs animation:
@@ -670,7 +709,8 @@ class FluentLayoutTransition:
                 animations.addAnimation(anim)
 
         if animations.animationCount() > 0:
-            animations.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            animations.start(
+                QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
         return animations
 
 # Add QAbstractAnimation for DeletionPolicy and Property for FluentSequence dummy property

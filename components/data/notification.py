@@ -6,10 +6,11 @@ Enhanced notification systems and complex status indicators
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
                                QGraphicsOpacityEffect, QSizePolicy, QPushButton)
 from PySide6.QtCore import (Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve,
-                            QByteArray, Property)
+                            QByteArray, Property, QEvent)
 from PySide6.QtGui import (QPainter, QColor, QBrush,
                            QPen, QPaintEvent, QRadialGradient)
 from core.theme import theme_manager
+from core.enhanced_animations import FluentTransition, FluentMicroInteraction
 from typing import Optional
 from enum import Enum
 
@@ -206,28 +207,35 @@ class FluentToast(QFrame):
         self._close_button.setObjectName("closeButton")
 
     def _setup_animations(self):
-        """Setup entrance and exit animations"""
+        """Setup enhanced entrance and exit animations"""
         # Create opacity effect
         self._opacity_effect = QGraphicsOpacityEffect(self)
         self._opacity_effect.setOpacity(0.0)
         self.setGraphicsEffect(self._opacity_effect)
 
-        # Create fade in animation
-        self._fade_in_anim = QPropertyAnimation(
-            self._opacity_effect, QByteArray(b"opacity"))
-        self._fade_in_anim.setDuration(300)
+        # Create fade in animation with spring easing
+        self._fade_in_anim = FluentTransition.create_transition(
+            self,
+            FluentTransition.FADE,
+            duration=300,
+            easing=FluentTransition.EASE_SPRING
+        )
         self._fade_in_anim.setStartValue(0.0)
         self._fade_in_anim.setEndValue(1.0)
-        self._fade_in_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
 
-        # Create fade out animation
-        self._fade_out_anim = QPropertyAnimation(
-            self._opacity_effect, QByteArray(b"opacity"))
-        self._fade_out_anim.setDuration(300)
+        # Create fade out animation with elastic easing
+        self._fade_out_anim = FluentTransition.create_transition(
+            self,
+            FluentTransition.FADE,
+            duration=300,
+            easing=FluentTransition.EASE_ELASTIC
+        )
         self._fade_out_anim.setStartValue(1.0)
         self._fade_out_anim.setEndValue(0.0)
-        self._fade_out_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._fade_out_anim.finished.connect(self._on_fade_out_finished)
+
+        # Add micro-interaction to close button
+        self._close_button.installEventFilter(self)
 
     def show(self):
         """Show toast with animation"""
@@ -254,9 +262,18 @@ class FluentToast(QFrame):
         """Handle fade out animation completion"""
         self.hide()
         self.closed.emit()
-
-        # Schedule deletion
         self.deleteLater()
+
+    def eventFilter(self, obj, event):
+        """Handle micro-interactions for close button"""
+        if obj == self._close_button:
+            if event.type() == QEvent.Type.Enter:
+                FluentMicroInteraction.hover_glow(obj, intensity=0.3).start()
+            elif event.type() == QEvent.Type.Leave:
+                FluentMicroInteraction.hover_glow(obj, intensity=0.0).start()
+            elif event.type() == QEvent.Type.MouseButtonPress:
+                FluentMicroInteraction.button_press(obj, scale=0.95)
+        return super().eventFilter(obj, event)
 
     def set_message(self, message: str):
         """Update message text"""
@@ -507,16 +524,16 @@ class FluentStatusBadge(QWidget):
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def _setup_animation(self):
-        """Setup pulse animation for certain statuses"""
+        """Setup enhanced pulse animation with spring effect"""
         self._animation = QPropertyAnimation(self, QByteArray(b"pulseValue"))
         self._animation.setDuration(2000)
         self._animation.setStartValue(0.0)
         self._animation.setEndValue(1.0)
-        self._animation.setLoopCount(-1)  # Loop forever
-        self._animation.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self._animation.setLoopCount(-1)
+        self._animation.setEasingCurve(FluentTransition.EASE_SPRING)
 
         # Start animation for animated statuses
-        if self._status == self.Status.ONLINE or self._status == self.Status.BUSY:
+        if self._status in [self.Status.ONLINE, self.Status.BUSY]:
             self._animation.start()
 
     def paintEvent(self, event: QPaintEvent):
