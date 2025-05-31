@@ -1,19 +1,21 @@
 """
-Fluent Design Style Card Component
+Fluent Design Style Card Component - Optimized Version
+Enhanced performance, consistent theming, and smooth animations
 """
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGraphicsDropShadowEffect
-from PySide6.QtCore import Qt, Signal, QPropertyAnimation, Property, QByteArray, QTimer
-from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPixmap
+from PySide6.QtCore import Qt, Signal, QPropertyAnimation, Property, QByteArray, QTimer, QParallelAnimationGroup
+from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPixmap, QFont
 from core.theme import theme_manager
 from core.animation import FluentAnimation
 from core.enhanced_animations import (FluentTransition, FluentMicroInteraction,
                                       FluentRevealEffect, FluentSequence)
-from typing import Optional
+from typing import Optional, Dict, Any
+import weakref
 
 
 class FluentCard(QFrame):
-    """Fluent Design style card component with enhanced animations"""
+    """Fluent Design style card component with optimized animations and consistent theming"""
 
     # Signals
     clicked = Signal()
@@ -21,9 +23,13 @@ class FluentCard(QFrame):
     pressProgressChanged = Signal(float)
     currentElevationChanged = Signal(float)
 
+    # Class-level animation cache for performance
+    _animation_cache: Dict[str, Any] = {}
+
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
+        # Core properties
         self._clickable = False
         self._elevation = 2
         self._hover_elevation = 4
@@ -31,11 +37,23 @@ class FluentCard(QFrame):
         self._current_elevation = 2.0
         self._hover_progress = 0.0
         self._press_progress = 0.0
+        
+        # Performance optimizations
+        self._style_cache = {}
+        self._shadow_cache = {}
+        self._theme_version = 0
+        
+        # Animation groups for better performance
+        self._hover_group = None
+        self._press_group = None
+        
+        # Weak reference to prevent memory leaks
+        self._active_animations = weakref.WeakSet()
 
         self._setup_ui()
-        self._setup_style()
-        self._setup_enhanced_animations()
-        self._setup_shadow()
+        self._setup_optimized_style()
+        self._setup_optimized_animations()
+        self._setup_optimized_shadow()
 
         if theme_manager:
             theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -48,83 +66,139 @@ class FluentCard(QFrame):
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(16, 16, 16, 16)
         self._layout.setSpacing(12)
-
-    def _setup_style(self):
-        """Setup component style"""
+        
+    def _setup_optimized_style(self):
+        """Setup component style with caching and theme consistency"""
         theme = theme_manager
-
+        current_theme_version = getattr(theme, '_version', 0)
+        
+        # Check cache validity
+        cache_key = f"{self._corner_radius}_{current_theme_version}"
+        if cache_key in self._style_cache and self._theme_version == current_theme_version:
+            self.setStyleSheet(self._style_cache[cache_key])
+            return
+        
+        # Generate optimized stylesheet with consistent theming
         style_sheet = f"""
             FluentCard {{
                 background-color: {theme.get_color('surface').name()};
                 border: 1px solid {theme.get_color('border').name()};
                 border-radius: {self._corner_radius}px;
-                transition: all 0.3s ease;
+                /* Remove transition from CSS for better performance */
             }}
             FluentCard:hover {{
                 border-color: {theme.get_color('primary').name()};
             }}
+            FluentCard[clickable="true"] {{
+                cursor: pointer;
+            }}
+            FluentCard[clickable="true"]:hover {{
+                background-color: {theme.get_color('surface_variant').name()};
+            }}
         """
-
+        
+        # Cache the stylesheet
+        self._style_cache[cache_key] = style_sheet
+        self._theme_version = current_theme_version
         self.setStyleSheet(style_sheet)
-
-    def _setup_enhanced_animations(self):
-        """Setup enhanced animation system"""
-        # Enhanced hover animation
+        
+        # Set property for CSS selector
+        self.setProperty("clickable", self._clickable)
+        
+    def _setup_optimized_animations(self):
+        """Setup optimized animation system with better performance"""
+        # Create animation groups for better coordination
+        self._hover_group = QParallelAnimationGroup(self)
+        self._press_group = QParallelAnimationGroup(self)
+        
+        # Optimized hover animation with smooth easing
         self._hover_animation = QPropertyAnimation(
-            self, QByteArray(b"hover_progress"))
+            self, QByteArray(b"hover_progress"), self)
         self._hover_animation.setDuration(FluentAnimation.DURATION_FAST)
         self._hover_animation.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        self._hover_group.addAnimation(self._hover_animation)
 
-        # Enhanced press animation
+        # Optimized press animation with crisp response
         self._press_animation = QPropertyAnimation(
-            self, QByteArray(b"press_progress"))
+            self, QByteArray(b"press_progress"), self)
         self._press_animation.setDuration(FluentAnimation.DURATION_ULTRA_FAST)
         self._press_animation.setEasingCurve(FluentTransition.EASE_CRISP)
+        self._press_group.addAnimation(self._press_animation)
 
-        # Enhanced elevation animation
+        # Optimized elevation animation with spring effect
         self._elevation_animation = QPropertyAnimation(
-            self, QByteArray(b"current_elevation"))
-        self._elevation_animation.setDuration(FluentAnimation.DURATION_FAST)
+            self, QByteArray(b"current_elevation"), self)
+        self._elevation_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
         self._elevation_animation.setEasingCurve(FluentTransition.EASE_SPRING)
+        self._hover_group.addAnimation(self._elevation_animation)
 
-        # Entrance animation
-        QTimer.singleShot(50, self._show_entrance_animation)
+        # Add to active animations for cleanup
+        self._active_animations.add(self._hover_group)
+        self._active_animations.add(self._press_group)
 
-    def _show_entrance_animation(self):
-        """Show entrance animation with enhanced effects"""
+        # Delayed entrance animation for performance
+        QTimer.singleShot(100, self._show_optimized_entrance_animation)
+        
+    def _show_optimized_entrance_animation(self):
+        """Show optimized entrance animation with performance considerations"""
+        # Only animate if widget is visible to improve performance
+        if not self.isVisible():
+            return
+            
         entrance_sequence = FluentSequence(self)
 
-        # Fade in effect
+        # Optimized fade in effect
         entrance_sequence.addCallback(
-            lambda: FluentRevealEffect.fade_in(self, 300))
-        entrance_sequence.addPause(100)
+            lambda: FluentRevealEffect.fade_in(self, 250))
+        entrance_sequence.addPause(50)  # Reduced pause for snappier feel
 
-        # Scale in effect with slight bounce
+        # Optimized scale in effect with subtle bounce
         entrance_sequence.addCallback(
-            lambda: FluentRevealEffect.scale_in(self, 250))
+            lambda: FluentRevealEffect.scale_in(self, 200))
 
         entrance_sequence.start()
-
-    def _setup_shadow(self):
-        """Setup drop shadow effect with enhanced styling"""
-        self._shadow = QGraphicsDropShadowEffect()
-        self._update_shadow()
+        self._active_animations.add(entrance_sequence)
+        
+    def _setup_optimized_shadow(self):
+        """Setup optimized drop shadow effect with caching"""
+        self._shadow = QGraphicsDropShadowEffect(self)
+        self._update_optimized_shadow()
         self.setGraphicsEffect(self._shadow)
-
-    def _update_shadow(self):
-        """Update shadow based on current elevation with enhanced parameters"""
+        
+    def _update_optimized_shadow(self):
+        """Update shadow with caching and optimized parameters"""
         theme = theme_manager
+        elevation_key = f"{self._current_elevation}_{self._theme_version}"
+        
+        # Check shadow cache
+        if elevation_key in self._shadow_cache:
+            cached_shadow = self._shadow_cache[elevation_key]
+            self._shadow.setBlurRadius(cached_shadow['blur'])
+            self._shadow.setOffset(cached_shadow['offset_x'], cached_shadow['offset_y'])
+            self._shadow.setColor(cached_shadow['color'])
+            return
 
-        blur_radius = self._current_elevation * 3  # Enhanced blur
-        offset = max(1, self._current_elevation // 2)  # More subtle offset
+        # Calculate optimized shadow parameters
+        blur_radius = max(2, self._current_elevation * 2.5)  # More subtle blur
+        offset_y = max(1, int(self._current_elevation * 0.8))  # More natural offset
+        offset_x = 0  # Keep horizontal offset at 0 for cleaner look
 
+        # Optimized shadow color with better alpha calculation
+        shadow_color = QColor(theme.get_color('shadow'))
+        alpha = min(100, int(40 + self._current_elevation * 8))  # More subtle shadow
+        shadow_color.setAlpha(alpha)
+
+        # Cache the shadow parameters
+        self._shadow_cache[elevation_key] = {
+            'blur': blur_radius,
+            'offset_x': offset_x,
+            'offset_y': offset_y,
+            'color': shadow_color
+        }
+
+        # Apply shadow settings
         self._shadow.setBlurRadius(blur_radius)
-        self._shadow.setOffset(0, offset)
-
-        # Enhanced shadow color with opacity based on elevation
-        shadow_color = theme.get_color('shadow')
-        shadow_color.setAlpha(
-            int(60 + self._current_elevation * 10))  # Dynamic opacity
+        self._shadow.setOffset(offset_x, offset_y)
         self._shadow.setColor(shadow_color)
 
     # Enhanced property getters and setters
@@ -148,12 +222,12 @@ class FluentCard(QFrame):
 
     def _get_current_elevation(self):
         return self._current_elevation
-
+        
     def _set_current_elevation(self, value):
         if self._current_elevation != value:
             self._current_elevation = value
             self.currentElevationChanged.emit(value)
-            self._update_shadow()
+            self._update_optimized_shadow()
 
     hover_progress = Property(float, _get_hover_progress, _set_hover_progress, None, "",
                               notify=hoverProgressChanged)
@@ -162,37 +236,14 @@ class FluentCard(QFrame):
     current_elevation = Property(float, _get_current_elevation, _set_current_elevation, None, "",
                                  notify=currentElevationChanged)
 
-    def setClickable(self, clickable: bool):
-        """Set whether the card is clickable with transition"""
-        if self._clickable != clickable:
-            self._clickable = clickable
-
-            if clickable:
-                self.setCursor(Qt.CursorShape.PointingHandCursor)
-                # Add hover indication
-                FluentMicroInteraction.pulse_animation(self, 1.02)
-            else:
-                self.setCursor(Qt.CursorShape.ArrowCursor)
-
     def isClickable(self) -> bool:
         """Check if the card is clickable"""
         return self._clickable
 
-    def setElevation(self, elevation: int):
-        """Set the card elevation with animation"""
-        new_elevation = max(0, float(elevation))
-        if self._elevation != new_elevation:
-            old_elevation = self._current_elevation
-            self._elevation = new_elevation
-
-            # Animate elevation change
-            self._elevation_animation.setStartValue(old_elevation)
-            self._elevation_animation.setEndValue(new_elevation)
-            self._elevation_animation.start()
-
     def getElevation(self) -> int:
         """Get the card elevation"""
         return int(self._elevation)
+
 
     def setHoverElevation(self, elevation: int):
         """Set the elevation when hovered with validation"""
@@ -201,47 +252,51 @@ class FluentCard(QFrame):
     def getHoverElevation(self) -> int:
         """Get the hover elevation"""
         return int(self._hover_elevation)
-
+        
     def setCornerRadius(self, radius: int):
-        """Set the corner radius with transition"""
+        """Set the corner radius with optimized transition"""
         new_radius = max(0, radius)
         if self._corner_radius != new_radius:
             self._corner_radius = new_radius
-            self._setup_style()
-            FluentMicroInteraction.pulse_animation(self, 1.01)
+            # Clear style cache to force refresh
+            self._style_cache.clear()
+            self._setup_optimized_style()
+            FluentMicroInteraction.pulse_animation(self, 1.005)  # Subtle animation
 
     def getCornerRadius(self) -> int:
         """Get the corner radius"""
         return self._corner_radius
 
-    # Enhanced layout management methods
-    def addWidget(self, widget: QWidget):
-        """Add a widget to the card's main layout with animation"""
+    # Enhanced layout management methods    def addWidget(self, widget: QWidget):
+        """Add a widget to the card's main layout with optimized animation"""
         widget.setParent(self)
         self._layout.addWidget(widget)
 
-        # Add entrance animation for new widget
-        FluentRevealEffect.slide_in(widget, 250, "up")
+        # Only animate if widget is visible for better performance
+        if self.isVisible():
+            FluentRevealEffect.slide_in(widget, 200, "up")
 
     def insertWidget(self, index: int, widget: QWidget):
-        """Insert a widget at the specified index with animation"""
+        """Insert a widget at the specified index with optimized animation"""
         widget.setParent(self)
         self._layout.insertWidget(index, widget)
 
-        # Add entrance animation
-        FluentRevealEffect.scale_in(widget, 200)
+        # Optimized entrance animation
+        if self.isVisible():
+            FluentRevealEffect.scale_in(widget, 150)
 
     def removeWidget(self, widget: QWidget):
-        """Remove a widget from the card with animation"""
-        if widget in [self._layout.itemAt(i).widget() for i in range(self._layout.count())]:
-            # Animate removal
+        """Remove a widget from the card with optimized animation"""
+        if widget in [self._layout.itemAt(i).widget() for i in range(self._layout.count()) if self._layout.itemAt(i).widget()]:
+            # Optimized removal animation
             removal_sequence = FluentSequence(self)
             removal_sequence.addCallback(
                 lambda: FluentMicroInteraction.scale_animation(widget, 0.0))
-            removal_sequence.addPause(200)
+            removal_sequence.addPause(150)  # Reduced pause
             removal_sequence.addCallback(
                 lambda: self._complete_widget_removal(widget))
             removal_sequence.start()
+            self._active_animations.add(removal_sequence)
 
     def _complete_widget_removal(self, widget: QWidget):
         """Complete widget removal"""
@@ -255,118 +310,200 @@ class FluentCard(QFrame):
     def addStretch(self, stretch: int = 0):
         """Add stretch to the card's main layout"""
         self._layout.addStretch(stretch)
-
+        
     def setMargins(self, left: int, top: int, right: int, bottom: int):
-        """Set content margins for the card's main layout with transition"""
+        """Set content margins with optimized transition"""
         self._layout.setContentsMargins(left, top, right, bottom)
-        FluentMicroInteraction.pulse_animation(self, 1.01)
+        # Reduced animation intensity for better performance
+        FluentMicroInteraction.pulse_animation(self, 1.005)
 
     def setSpacing(self, spacing: int):
-        """Set layout spacing for the card's main layout with transition"""
+        """Set layout spacing with optimized transition"""
         self._layout.setSpacing(max(0, spacing))
-        FluentMicroInteraction.pulse_animation(self, 1.01)
+        # Reduced animation intensity for better performance
+        FluentMicroInteraction.pulse_animation(self, 1.005)
 
-    # Enhanced event handlers
-    def enterEvent(self, event):
-        """Handle mouse enter with enhanced animation"""
-        if self._clickable:
-            # Enhanced hover animation
-            self._hover_animation.setStartValue(self._hover_progress)
-            self._hover_animation.setEndValue(1.0)
-            self._hover_animation.start()
+    def setClickable(self, clickable: bool):
+        """Set whether the card is clickable with optimized feedback"""
+        if self._clickable != clickable:
+            self._clickable = clickable
+            
+            # Update CSS property for styling
+            self.setProperty("clickable", clickable)
+            self._setup_optimized_style()
 
-            # Enhanced elevation animation
-            self._elevation_animation.setStartValue(self._current_elevation)
-            self._elevation_animation.setEndValue(self._hover_elevation)
+            if clickable:
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+                # Subtle hover indication
+                FluentMicroInteraction.pulse_animation(self, 1.01)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def setElevation(self, elevation: int):
+        """Set the card elevation with optimized animation"""
+        new_elevation = max(0, float(elevation))
+        if self._elevation != new_elevation:
+            old_elevation = self._current_elevation
+            self._elevation = new_elevation
+
+            # Optimized elevation animation
+            self._elevation_animation.setStartValue(old_elevation)
+            self._elevation_animation.setEndValue(new_elevation)
             self._elevation_animation.start()
 
-            # Subtle hover glow effect
-            FluentMicroInteraction.hover_glow(self, 0.1)
+    def cleanup(self):
+        """Cleanup method to prevent memory leaks"""
+        # Stop all active animations
+        for animation in list(self._active_animations):
+            if animation and hasattr(animation, 'stop'):
+                animation.stop()
+        
+        # Clear caches
+        self._style_cache.clear()
+        self._shadow_cache.clear()
+        
+        # Clear animation groups
+        if self._hover_group:
+            self._hover_group.stop()
+            self._hover_group = None
+        if self._press_group:
+            self._press_group.stop()
+            self._press_group = None
+
+    # Enhanced event handlers
+    
+    def enterEvent(self, event):
+        """Handle mouse enter with optimized animation coordination"""
+        if self._clickable:
+            # Stop any running animations first
+            if self._hover_group and self._hover_group.state() == QParallelAnimationGroup.State.Running:
+                self._hover_group.stop()
+
+            # Coordinated hover animation
+            self._hover_animation.setStartValue(self._hover_progress)
+            self._hover_animation.setEndValue(1.0)
+            self._elevation_animation.setStartValue(self._current_elevation)
+            self._elevation_animation.setEndValue(self._hover_elevation)
+            
+            # Start coordinated animation group if exists
+            if self._hover_group:
+                self._hover_group.start()
+
+            # Optimized hover glow effect (reduced intensity)
+            FluentMicroInteraction.hover_glow(self, 0.05)
 
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Handle mouse leave with enhanced animation"""
+        """Handle mouse leave with optimized animation coordination"""
         if self._clickable:
-            # Return to normal state
+            # Stop any running animations first
+            if self._hover_group and self._hover_group.state() == QParallelAnimationGroup.State.Running:
+                self._hover_group.stop()
+
+            # Coordinated return animation
             self._hover_animation.setStartValue(self._hover_progress)
             self._hover_animation.setEndValue(0.0)
-            self._hover_animation.start()
-
-            # Return elevation to normal
             self._elevation_animation.setStartValue(self._current_elevation)
             self._elevation_animation.setEndValue(self._elevation)
-            self._elevation_animation.start()
+            
+            # Start coordinated animation group if exists
+            if self._hover_group:
+                self._hover_group.start()
 
             # Remove glow effect
-            FluentMicroInteraction.hover_glow(self, -0.1)
+            FluentMicroInteraction.hover_glow(self, -0.05)
 
         super().leaveEvent(event)
-
+        
     def mousePressEvent(self, event):
-        """Handle mouse press with enhanced animation"""
+        """Handle mouse press with optimized animation response"""
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
-            # Enhanced press animation
+            # Stop any running press animations
+            if self._press_group and self._press_group.state() == QParallelAnimationGroup.State.Running:
+                self._press_group.stop()
+
+            # Optimized press animation (more responsive)
             self._press_animation.setStartValue(self._press_progress)
             self._press_animation.setEndValue(1.0)
-            self._press_animation.start()
+            if self._press_group:
+                if self._press_group:
+                    self._press_group.start()
 
-            # Scale down effect
-            FluentMicroInteraction.button_press(self, 0.98)
+            # Subtle scale down effect (reduced scale change)
+            FluentMicroInteraction.button_press(self, 0.995)
 
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """Handle mouse release with enhanced animation"""
+        """Handle mouse release with optimized feedback"""
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
-            # Release animation
+            # Stop any running press animations
+            if self._press_group and self._press_group.state() == QParallelAnimationGroup.State.Running:
+                self._press_group.stop()
+
+            # Quick release animation
             self._press_animation.setStartValue(self._press_progress)
             self._press_animation.setEndValue(0.0)
-            self._press_animation.start()
+            if self._press_group:
+                self._press_group.start()
 
             # Emit clicked signal if mouse is still over widget
             if self.rect().contains(event.position().toPoint()):
-                # Add ripple effect before emitting signal
+                # Optimized ripple effect with shorter delay
                 FluentMicroInteraction.ripple_effect(self)
-                QTimer.singleShot(100, self.clicked.emit)
+                QTimer.singleShot(50, self.clicked.emit)  # Faster response
 
         super().mouseReleaseEvent(event)
-
+        
     def paintEvent(self, event):
-        """Paint the card with enhanced custom effects"""
+        """Paint the card with optimized custom effects and better performance"""
         super().paintEvent(event)
 
-        if self._hover_progress > 0 or self._press_progress > 0:
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Only paint custom effects if there's actual progress to show
+        if self._hover_progress <= 0 and self._press_progress <= 0:
+            return
 
-            # Create enhanced card path
-            path = QPainterPath()
-            rect_adjusted = self.rect().adjusted(1, 1, -1, -1)
-            path.addRoundedRect(
-                rect_adjusted, self._corner_radius - 1, self._corner_radius - 1)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-            # Draw enhanced hover effect
-            if self._hover_progress > 0:
-                theme = theme_manager
-                hover_color = QColor(theme.get_color('accent_light'))
-                hover_color.setAlphaF(
-                    0.12 * self._hover_progress)  # Enhanced opacity
-                painter.fillPath(path, QBrush(hover_color))
+        # Create optimized card path (cached if possible)
+        rect_adjusted = self.rect().adjusted(1, 1, -1, -1)
+        path = QPainterPath()
+        path.addRoundedRect(rect_adjusted, self._corner_radius - 1, self._corner_radius - 1)
 
-            # Draw enhanced press effect
-            if self._press_progress > 0:
-                theme = theme_manager
-                press_color = QColor(theme.get_color('primary'))
-                # Subtle press effect
-                press_color.setAlphaF(0.08 * self._press_progress)
-                painter.fillPath(path, QBrush(press_color))
+        theme = theme_manager
 
+        # Draw optimized hover effect with better blending
+        if self._hover_progress > 0:
+            hover_color = QColor(theme.get_color('accent_light'))
+            # Smoother opacity curve
+            opacity = 0.08 * self._hover_progress * self._hover_progress  # Quadratic easing
+            hover_color.setAlphaF(opacity)
+            painter.fillPath(path, QBrush(hover_color))
+
+        # Draw optimized press effect with subtle feedback
+        if self._press_progress > 0:
+            press_color = QColor(theme.get_color('primary'))
+            # More subtle press effect with better curve
+            opacity = 0.05 * self._press_progress
+            press_color.setAlphaF(opacity)
+            painter.fillPath(path, QBrush(press_color))
+
+        painter.end()  # Explicit cleanup for better performance
+        
     def _on_theme_changed(self, _=None):
-        """Handle theme change with transition"""
-        self._setup_style()
-        self._update_shadow()
-        FluentMicroInteraction.pulse_animation(self, 1.02)
+        """Handle theme change with optimized transition"""
+        # Clear caches to force refresh
+        self._style_cache.clear()
+        self._shadow_cache.clear()
+        
+        # Update styling
+        self._setup_optimized_style()
+        self._update_optimized_shadow()
+        
+        # Subtle theme transition animation
+        FluentMicroInteraction.pulse_animation(self, 1.01)
         self.update()
 
 

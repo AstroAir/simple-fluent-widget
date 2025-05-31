@@ -423,6 +423,8 @@ class FluentStateTransition:
 
 
 class FluentRevealEffect:
+    """Modern reveal animations for content"""
+
     @staticmethod
     def fade_in(widget: QWidget, duration: int = 300) -> QPropertyAnimation:
         """Fade in animation"""
@@ -434,6 +436,22 @@ class FluentRevealEffect:
         fade_anim.setDuration(duration)
         fade_anim.setStartValue(0.0)
         fade_anim.setEndValue(1.0)
+        fade_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        fade_anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+        return fade_anim
+
+    @staticmethod
+    def fade_out(widget: QWidget, duration: int = 300) -> QPropertyAnimation:
+        """Fade out animation"""
+        effect = widget.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(effect)
+        
+        fade_anim = QPropertyAnimation(effect, QByteArray(b"opacity"))
+        fade_anim.setDuration(duration)
+        fade_anim.setStartValue(1.0)
+        fade_anim.setEndValue(0.0)
         fade_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
         fade_anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
         return fade_anim

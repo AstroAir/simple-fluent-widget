@@ -3,22 +3,17 @@ Fluent Design Menu and Command Components
 Advanced menu systems, command palettes, and context menus
 """
 
+from PySide6.QtCore import QByteArray, Qt, Signal, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
-    QLineEdit, QListWidget, QListWidgetItem, QMenu, QAction, QScrollArea,
-    QButtonGroup, QSplitter, QTreeWidget, QTreeWidgetItem, QComboBox,
-    QCheckBox, QToolButton, QWidgetAction, QGraphicsDropShadowEffect
-)
-from PySide6.QtCore import (
-    Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve, QRect,
-    QPoint, QSize, QParallelAnimationGroup, QSequentialAnimationGroup
+    QLineEdit, QListWidget, QListWidgetItem, QMenu, 
+    QGraphicsDropShadowEffect, QButtonGroup
 )
 from PySide6.QtGui import (
-    QFont, QIcon, QPainter, QColor, QPixmap, QKeySequence, QAction as QGuiAction,
-    QPalette, QFontMetrics, QLinearGradient, QBrush, QPen
+    QFont, QIcon, QColor, QKeySequence, QCursor, QAction
 )
 from core.theme import theme_manager
-from typing import Optional, List, Dict, Any, Callable, Union
+from typing import Optional, List, Dict, Any, Callable
 from enum import Enum
 
 
@@ -34,8 +29,8 @@ class MenuItemType(Enum):
 class FluentMenuItem:
     """Menu item data structure"""
 
-    def __init__(self, text: str = "", icon: QIcon = None, item_type: MenuItemType = MenuItemType.ACTION,
-                 action: Callable = None, shortcut: str = "", checked: bool = False,
+    def __init__(self, text: str = "", icon: Optional[QIcon] = None, item_type: MenuItemType = MenuItemType.ACTION,
+                 action: Optional[Callable[..., Any]] = None, shortcut: str = "", checked: bool = False,
                  enabled: bool = True, data: Any = None):
         self.text = text
         self.icon = icon
@@ -45,7 +40,7 @@ class FluentMenuItem:
         self.checked = checked
         self.enabled = enabled
         self.data = data
-        self.children = []  # For submenus
+        self.children: List['FluentMenuItem'] = []  # For submenus
 
 
 class FluentMenu(QMenu):
@@ -71,7 +66,7 @@ class FluentMenu(QMenu):
 
     def setup_animations(self):
         """Setup menu animations"""
-        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation = QPropertyAnimation(self, QByteArray(b"windowOpacity"))
         self.fade_animation.setDuration(150)
         self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
@@ -104,7 +99,7 @@ class FluentMenu(QMenu):
                 submenu.add_menu_item(child)
 
             return self.addMenu(submenu)
-        else:
+        else: # ACTION or CUSTOM (handled similarly here)
             action = QAction(item.text, self)
             if item.icon:
                 action.setIcon(item.icon)
@@ -168,20 +163,16 @@ class FluentContextMenu(FluentMenu):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.target_widget = None
-        self.context_data = None
+        self.target_widget: Optional[QWidget] = None
+        self.context_data: Any = None
 
-    def show_at_cursor(self, target_widget: QWidget = None, data: Any = None):
+    def show_at_cursor(self, target_widget: Optional[QWidget] = None, data: Any = None):
         """Show context menu at cursor position"""
         self.target_widget = target_widget
         self.context_data = data
+        self.exec(QCursor.pos())
 
-        cursor_pos = self.parent().mapFromGlobal(self.parent().cursor().pos()
-                                                 ) if self.parent() else self.cursor().pos()
-        self.exec(self.parent().mapToGlobal(cursor_pos)
-                  if self.parent() else cursor_pos)
-
-    def add_context_action(self, text: str, action: Callable, icon: QIcon = None,
+    def add_context_action(self, text: str, action: Callable[[Optional[QWidget], Any], None], icon: Optional[QIcon] = None,
                            shortcut: str = "", enabled: bool = True):
         """Add a context-aware action"""
         def context_action():
@@ -202,8 +193,8 @@ class FluentCommandPalette(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        self.commands = {}  # command_id -> command_info
-        self.filtered_commands = []
+        self.commands: Dict[str, Dict[str, Any]] = {}
+        self.filtered_commands: List[Dict[str, Any]] = []
         self.selected_index = 0
 
         self.setup_ui()
@@ -260,19 +251,19 @@ class FluentCommandPalette(QWidget):
 
     def setup_animations(self):
         """Setup animations"""
-        self.fade_animation = QPropertyAnimation(self, b"windowOpacity")
+        self.fade_animation = QPropertyAnimation(self, QByteArray(b"windowOpacity"))
         self.fade_animation.setDuration(200)
         self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
-        self.scale_animation = QPropertyAnimation(self.container, b"geometry")
+        self.scale_animation = QPropertyAnimation(self.container, QByteArray(b"geometry"))
         self.scale_animation.setDuration(200)
         self.scale_animation.setEasingCurve(QEasingCurve.Type.OutBack)
 
     def add_command(self, command_id: str, title: str, description: str = "",
-                    category: str = "General", icon: QIcon = None,
-                    action: Callable = None, shortcut: str = ""):
+                    category: str = "General", icon: Optional[QIcon] = None,
+                    action: Optional[Callable[..., Any]] = None, shortcut: str = ""):
         """Add a command to the palette"""
-        command_info = {
+        command_info: Dict[str, Any] = {
             'id': command_id,
             'title': title,
             'description': description,
@@ -284,13 +275,13 @@ class FluentCommandPalette(QWidget):
         }
 
         self.commands[command_id] = command_info
-        self.refresh_command_list()
+        self.filter_commands("") # Reset view by filtering with an empty string
 
     def remove_command(self, command_id: str):
         """Remove a command from the palette"""
         if command_id in self.commands:
             del self.commands[command_id]
-            self.refresh_command_list()
+            self.filter_commands(self.search_input.text()) # Re-filter with current text
 
     def filter_commands(self, search_text: str):
         """Filter commands based on search text"""
@@ -300,21 +291,26 @@ class FluentCommandPalette(QWidget):
             self.filtered_commands = list(self.commands.values())
         else:
             self.filtered_commands = []
-            for command in self.commands.values():
+            for command_id in self.commands: # Iterate over keys to get original order somewhat
+                command = self.commands[command_id]
                 # Check if search text matches any keywords
                 if any(search_text in keyword for keyword in command['keywords']):
                     self.filtered_commands.append(command)
+        
+        # Optionally sort filtered_commands here, e.g., by title or category
+        # self.filtered_commands.sort(key=lambda cmd: (cmd['category'], cmd['title']))
 
-        self.refresh_command_list()
+
+        self.refresh_command_list_display()
         self.update_status()
 
-    def refresh_command_list(self):
-        """Refresh the command list display"""
+    def refresh_command_list_display(self): # Renamed from refresh_command_list to avoid confusion
+        """Refresh the command list display based on self.filtered_commands"""
         self.command_list.clear()
-        self.selected_index = 0
+        # self.selected_index = 0 # Resetting selection should be handled carefully
 
         # Group commands by category
-        categories = {}
+        categories: Dict[str, List[Dict[str, Any]]] = {}
         for command in self.filtered_commands:
             category = command['category']
             if category not in categories:
@@ -322,28 +318,42 @@ class FluentCommandPalette(QWidget):
             categories[category].append(command)
 
         # Add commands to list grouped by category
-        for category, commands in categories.items():
-            if len(categories) > 1:  # Only show category headers if multiple categories
-                # Add category header
-                header_item = QListWidgetItem(category)
+        # Sort categories for consistent order
+        sorted_category_names = sorted(categories.keys())
+
+        item_count = 0
+        for category_name in sorted_category_names:
+            commands_in_category = categories[category_name]
+            if len(categories) > 1: # Only show category headers if multiple categories
+                header_item = QListWidgetItem(category_name)
                 header_item.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
                 header_item.setFlags(Qt.ItemFlag.NoItemFlags)  # Not selectable
                 self.command_list.addItem(header_item)
 
-            for command in commands:
+            for command in commands_in_category:
                 item = QListWidgetItem()
                 item.setData(Qt.ItemDataRole.UserRole, command)
 
-                # Create custom widget for command item
                 widget = self.create_command_widget(command)
                 item.setSizeHint(widget.sizeHint())
 
                 self.command_list.addItem(item)
                 self.command_list.setItemWidget(item, widget)
+                item_count +=1
+        
+        if item_count > 0:
+            self.select_first_selectable_item()
+        else:
+            self.selected_index = -1 # No selectable items
 
-        # Select first selectable item
-        if self.command_list.count() > 0:
-            self.select_item(0)
+    def select_first_selectable_item(self):
+        for i in range(self.command_list.count()):
+            item = self.command_list.item(i)
+            if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.select_item(i)
+                return
+        self.selected_index = -1
+
 
     def create_command_widget(self, command: Dict[str, Any]) -> QWidget:
         """Create a widget for displaying a command"""
@@ -369,7 +379,9 @@ class FluentCommandPalette(QWidget):
         if command['description']:
             desc_label = QLabel(command['description'])
             desc_label.setFont(QFont("Segoe UI", 9))
-            desc_label.setStyleSheet("color: #888;")
+            # desc_label.setStyleSheet("color: #888;") # Use theme color
+            desc_label.setStyleSheet(f"color: {theme_manager.get_color('text_secondary').name()};")
+
             text_layout.addWidget(desc_label)
 
         layout.addLayout(text_layout)
@@ -380,7 +392,8 @@ class FluentCommandPalette(QWidget):
             shortcut_label = QLabel(command['shortcut'])
             shortcut_label.setFont(QFont("Segoe UI", 9))
             shortcut_label.setStyleSheet(
-                "color: #666; font-family: monospace;")
+                # "color: #666; font-family: monospace;") # Use theme color
+                f"color: {theme_manager.get_color('text_secondary').name()}; font-family: monospace;")
             layout.addWidget(shortcut_label)
 
         return widget
@@ -404,44 +417,78 @@ class FluentCommandPalette(QWidget):
             return
 
         current_row = self.command_list.currentRow()
-        new_row = max(
-            0, min(self.command_list.count() - 1, current_row + delta))
-
-        # Skip non-selectable items (headers)
-        while new_row < self.command_list.count() and new_row >= 0:
+        if current_row == -1 and delta < 0 : # No selection, up pressed, select last
+            new_row = self.command_list.count() -1
+        elif current_row == -1 and delta > 0 : # No selection, down pressed, select first
+            new_row = 0
+        else:
+            new_row = current_row + delta
+        
+        # Find next selectable item
+        original_new_row = new_row
+        while 0 <= new_row < self.command_list.count():
             item = self.command_list.item(new_row)
-            if item.flags() & Qt.ItemFlag.ItemIsSelectable:
-                break
-            new_row += delta if delta > 0 else -1
+            if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.select_item(new_row)
+                return
+            new_row += 1 if delta > 0 else -1
+        
+        # If we wrapped around and didn't find anything (e.g. only headers)
+        # or went out of bounds, try from the start/end if we didn't start there
+        if delta > 0 and original_new_row > 0: # Was moving down, try from top
+            new_row = 0
+            while 0 <= new_row < original_new_row : # Search up to where we started
+                 item = self.command_list.item(new_row)
+                 if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                    self.select_item(new_row)
+                    return
+        elif delta < 0 and original_new_row < self.command_list.count() -1 : # Was moving up, try from bottom
+            new_row = self.command_list.count() -1
+            while new_row > original_new_row: # Search down to where we started
+                 item = self.command_list.item(new_row)
+                 if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                    self.select_item(new_row)
+                    return
 
-        if 0 <= new_row < self.command_list.count():
-            self.select_item(new_row)
 
     def select_item(self, row: int):
         """Select item at given row"""
-        self.command_list.setCurrentRow(row)
-        self.selected_index = row
+        if 0 <= row < self.command_list.count():
+            item = self.command_list.item(row)
+            if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                 self.command_list.setCurrentRow(row)
+                 self.selected_index = row
+                 self.command_list.scrollToItem(item, QListWidget.ScrollHint.EnsureVisible)
+
 
     def execute_selected_command(self):
         """Execute the currently selected command"""
         current_item = self.command_list.currentItem()
-        if current_item:
+        if current_item and (current_item.flags() & Qt.ItemFlag.ItemIsSelectable) :
             command = current_item.data(Qt.ItemDataRole.UserRole)
             if command and command.get('action'):
-                command['action']()
-                self.commandExecuted.emit(command['id'], command)
+                try:
+                    command['action']()
+                    self.commandExecuted.emit(command['id'], command)
+                except Exception as e:
+                    print(f"Error executing command {command['id']}: {e}") # Basic error logging
                 self.close_palette()
 
     def on_item_clicked(self, item: QListWidgetItem):
         """Handle item click"""
-        command = item.data(Qt.ItemDataRole.UserRole)
-        if command and command.get('action'):
-            command['action']()
-            self.commandExecuted.emit(command['id'], command)
-            self.close_palette()
+        if item and (item.flags() & Qt.ItemFlag.ItemIsSelectable):
+            command = item.data(Qt.ItemDataRole.UserRole)
+            if command and command.get('action'):
+                try:
+                    command['action']()
+                    self.commandExecuted.emit(command['id'], command)
+                except Exception as e:
+                    print(f"Error executing command {command['id']}: {e}")
+                self.close_palette()
 
     def update_status(self):
         """Update status label"""
+        # Count actual command items, not headers
         count = len(self.filtered_commands)
         if count == 0:
             self.status_label.setText("No commands found")
@@ -450,20 +497,41 @@ class FluentCommandPalette(QWidget):
         else:
             self.status_label.setText(f"{count} commands found")
 
-    def show_palette(self, center_on: QWidget = None):
+    def show_palette(self, center_on: Optional[QWidget] = None):
         """Show the command palette"""
-        # Position the palette
         if center_on:
-            center_point = center_on.rect().center()
-            global_center = center_on.mapToGlobal(center_point)
-            palette_rect = QRect(0, 0, 600, 400)
+            parent_window = center_on.window() if center_on else self.parentWidget()
+            if parent_window:
+                center_point = parent_window.rect().center()
+                global_center = parent_window.mapToGlobal(center_point)
+            else: # Fallback to screen center if no clear parent window
+                screen_geo = self.screen().geometry() if self.screen() else QRect(0,0,800,600) # type: ignore
+                global_center = screen_geo.center()
+
+            palette_rect = QRect(0, 0, self.container.width(), self.container.height())
+            palette_rect.moveCenter(global_center)
+            
+            # Ensure it's within screen bounds
+            if self.screen():
+                screen_available_geo = self.screen().availableGeometry() # type: ignore
+                palette_rect.moveTo(
+                    max(screen_available_geo.left(), min(palette_rect.left(), screen_available_geo.right() - palette_rect.width())),
+                    max(screen_available_geo.top(), min(palette_rect.top(), screen_available_geo.bottom() - palette_rect.height()))
+                )
+            self.move(palette_rect.topLeft())
+        elif self.parentWidget():
+             # Center on parent if no specific widget given
+            parent_rect = self.parentWidget().rect()
+            global_center = self.parentWidget().mapToGlobal(parent_rect.center())
+            palette_rect = QRect(0, 0, self.container.width(), self.container.height())
             palette_rect.moveCenter(global_center)
             self.move(palette_rect.topLeft())
+
 
         # Reset state
         self.search_input.clear()
         self.search_input.setFocus()
-        self.filter_commands("")
+        self.filter_commands("") # This calls refresh_command_list_display and select_first_selectable_item
 
         # Show with animation
         self.show()
@@ -473,6 +541,15 @@ class FluentCommandPalette(QWidget):
         self.fade_animation.setStartValue(0.0)
         self.fade_animation.setEndValue(1.0)
         self.fade_animation.start()
+
+        # Initial scale for animation
+        # initial_rect = QRect(self.container.x() + self.container.width() // 2,
+        #                      self.container.y() + self.container.height() // 4, 0, 0)
+        # final_rect = self.container.geometry()
+        # self.scale_animation.setStartValue(initial_rect)
+        # self.scale_animation.setEndValue(final_rect)
+        # self.scale_animation.start()
+
 
     def close_palette(self):
         """Close the command palette"""
@@ -487,12 +564,18 @@ class FluentCommandPalette(QWidget):
         """Apply current theme"""
         theme = theme_manager
 
-        self.setStyleSheet(f"""
-            QFrame {{
+        self.container.setStyleSheet(f"""
+            QFrame#commandPaletteContainer {{ /* Updated to match actual objectName */
                 background-color: {theme.get_color('surface').name()};
                 border: 1px solid {theme.get_color('border').name()};
                 border-radius: 12px;
             }}
+        """)
+        if not self.container.objectName(): # Set object name if not already set for specific styling
+            self.container.setObjectName("commandPaletteContainer")
+
+
+        self.search_input.setStyleSheet(f"""
             QLineEdit {{
                 background-color: {theme.get_color('background').name()};
                 border: 2px solid {theme.get_color('border').name()};
@@ -504,27 +587,39 @@ class FluentCommandPalette(QWidget):
             QLineEdit:focus {{
                 border-color: {theme.get_color('primary').name()};
             }}
+        """)
+        self.command_list.setStyleSheet(f"""
             QListWidget {{
                 background-color: transparent;
                 border: none;
-                outline: none;
+                outline: none; /* For focus rectangle */
             }}
             QListWidget::item {{
                 background-color: transparent;
-                border: none;
-                border-radius: 6px;
-                margin: 1px;
+                border: none; /* Remove border from item itself */
+                border-radius: 6px; /* Add border-radius to item */
+                margin: 1px 4px; /* Add some horizontal margin */
+                padding: 2px; /* Add padding for the selection highlight */
             }}
             QListWidget::item:selected {{
                 background-color: {theme.get_color('accent_light').name()};
+                color: {theme.get_color('text_primary').name()}; /* Ensure text color contrasts */
             }}
             QListWidget::item:hover {{
-                background-color: {theme.get_color('accent_light').lighter(120).name()};
+                background-color: {theme.get_color('accent_light').lighter(110).name()};
             }}
+        """)
+        self.status_label.setStyleSheet(f"""
             QLabel {{
                 color: {theme.get_color('text_secondary').name()};
             }}
         """)
+
+class RibbonGroupFrame(QFrame):
+    """Custom QFrame for Ribbon Groups to hold content_layout."""
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.content_layout: Optional[QHBoxLayout] = None
 
 
 class FluentRibbonTab(QWidget):
@@ -533,31 +628,33 @@ class FluentRibbonTab(QWidget):
     def __init__(self, parent: Optional[QWidget] = None, title: str = ""):
         super().__init__(parent)
         self.title = title
-        self.groups = []
+        self.groups: List[RibbonGroupFrame] = [] # Use RibbonGroupFrame
 
+        self.main_layout: Optional[QHBoxLayout] = None # Renamed from self.layout
         self.setup_ui()
         self.setup_style()
         theme_manager.theme_changed.connect(self.apply_theme)
 
     def setup_ui(self):
         """Setup ribbon tab UI"""
-        self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(8, 8, 8, 8)
-        self.layout.setSpacing(12)
-        self.layout.addStretch()
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(8, 8, 8, 8)
+        self.main_layout.setSpacing(12)
+        self.main_layout.addStretch()
 
-    def add_group(self, title: str) -> QWidget:
+    def add_group(self, title: str) -> QWidget: # Returns the content_area widget
         """Add a group to the ribbon tab"""
-        group = QFrame()
+        group = RibbonGroupFrame() # Use custom frame
         group_layout = QVBoxLayout(group)
-        group_layout.setContentsMargins(8, 8, 8, 8)
+        group_layout.setContentsMargins(8, 8, 8, 8) # Margins for the group frame itself
         group_layout.setSpacing(4)
 
-        # Group content area
+        # Group content area (this is what's returned for adding buttons etc.)
         content_area = QWidget()
         content_layout = QHBoxLayout(content_area)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(4)
+        content_layout.setContentsMargins(0, 0, 0, 0) # No margins within the button holder
+        content_layout.setSpacing(4) # Spacing between buttons in the group
+        group.content_layout = content_layout # Assign to custom frame attribute
         group_layout.addWidget(content_area)
 
         # Group title
@@ -566,14 +663,13 @@ class FluentRibbonTab(QWidget):
         title_label.setFont(QFont("Segoe UI", 9))
         group_layout.addWidget(title_label)
 
-        # Insert before stretch
-        self.layout.insertWidget(self.layout.count() - 1, group)
+        # Insert before stretch in the main_layout of the tab
+        if self.main_layout:
+            self.main_layout.insertWidget(self.main_layout.count() - 1, group)
 
-        # Store reference
-        group.content_layout = content_layout
         self.groups.append(group)
-
         return content_area
+
 
     def setup_style(self):
         """Setup styling"""
@@ -583,24 +679,30 @@ class FluentRibbonTab(QWidget):
         """Apply current theme"""
         theme = theme_manager
 
+        # Style for the tab itself
         self.setStyleSheet(f"""
             FluentRibbonTab {{
                 background-color: {theme.get_color('surface').name()};
                 border-bottom: 1px solid {theme.get_color('border').name()};
             }}
-            QFrame {{
-                background-color: transparent;
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: 4px;
-                margin: 2px;
-            }}
-            QLabel {{
-                color: {theme.get_color('text_secondary').name()};
-                font-size: 9px;
-                border: none;
-                background-color: transparent;
-            }}
         """)
+        # Style for groups within the tab
+        for group_frame in self.groups:
+            group_frame.setStyleSheet(f"""
+                 RibbonGroupFrame {{ /* Style the custom frame */
+                    background-color: transparent; /* Or a subtle group background */
+                    border: 1px solid {theme.get_color('border').name()};
+                    border-radius: 4px;
+                    margin: 2px; /* Margin around each group */
+                }}
+                RibbonGroupFrame > QLabel {{ /* Style title label within the group */
+                    color: {theme.get_color('text_secondary').name()};
+                    font-size: 9px;
+                    border: none;
+                    background-color: transparent;
+                    padding-top: 2px; /* Space between content and title */
+                }}
+            """)
 
 
 class FluentRibbon(QWidget):
@@ -609,8 +711,8 @@ class FluentRibbon(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        self.tabs = {}
-        self.current_tab = None
+        self.tabs: Dict[str, Dict[str, Any]] = {}
+        self.current_tab: Optional[str] = None
 
         self.setup_ui()
         self.setup_style()
@@ -624,41 +726,50 @@ class FluentRibbon(QWidget):
 
         # Tab headers
         self.tab_header = QFrame()
-        self.tab_header.setFixedHeight(30)
+        self.tab_header.setObjectName("ribbonTabHeader")
+        self.tab_header.setFixedHeight(30) # Height of the tab bar
         self.tab_header_layout = QHBoxLayout(self.tab_header)
-        self.tab_header_layout.setContentsMargins(8, 0, 8, 0)
-        self.tab_header_layout.setSpacing(0)
+        self.tab_header_layout.setContentsMargins(8, 0, 8, 0) # Left/right padding for tab bar
+        self.tab_header_layout.setSpacing(0) # No space between tab buttons themselves
         self.tab_header_layout.addStretch()
 
         layout.addWidget(self.tab_header)
 
         # Tab content area
         self.tab_content = QFrame()
-        self.tab_content.setFixedHeight(100)
-        self.content_layout = QVBoxLayout(self.tab_content)
+        self.tab_content.setObjectName("ribbonTabContent")
+        # self.tab_content.setFixedHeight(100) # Height of the content area, can be dynamic
+        self.content_layout = QVBoxLayout(self.tab_content) # Stack tabs here
         self.content_layout.setContentsMargins(0, 0, 0, 0)
 
         layout.addWidget(self.tab_content)
 
         # Tab button group
-        self.tab_button_group = QButtonGroup()
-        self.tab_button_group.buttonClicked.connect(self.on_tab_changed)
+        self.tab_button_group = QButtonGroup(self) # Ensure parent is set
+        self.tab_button_group.setExclusive(True) # Only one tab button can be checked
+        self.tab_button_group.buttonClicked.connect(self.on_tab_button_clicked)
+
 
     def add_tab(self, tab_id: str, title: str) -> FluentRibbonTab:
         """Add a tab to the ribbon"""
         # Create tab button
         tab_button = QPushButton(title)
         tab_button.setCheckable(True)
-        tab_button.setFixedHeight(30)
+        tab_button.setFixedHeight(30) # Match tab_header height
+        tab_button.setObjectName(f"ribbonTabButton_{tab_id}")
         self.tab_button_group.addButton(tab_button)
 
-        # Insert before stretch
-        self.tab_header_layout.insertWidget(
-            self.tab_header_layout.count() - 1, tab_button)
 
-        # Create tab content
-        tab_widget = FluentRibbonTab(title=title)
-        tab_widget.setVisible(False)
+        # Insert before stretch in tab_header_layout
+        if self.tab_header_layout.count() > 0: # Check if stretch exists
+             self.tab_header_layout.insertWidget(self.tab_header_layout.count() - 1, tab_button)
+        else: # Should not happen if addStretch was called
+             self.tab_header_layout.addWidget(tab_button)
+
+
+        # Create tab content widget
+        tab_widget = FluentRibbonTab(title=title, parent=self.tab_content) # Parent to content area
+        tab_widget.setVisible(False) # Initially hidden
         self.content_layout.addWidget(tab_widget)
 
         # Store tab
@@ -668,34 +779,47 @@ class FluentRibbon(QWidget):
             'id': tab_id
         }
 
-        # Select first tab
+        # Select first tab added
         if len(self.tabs) == 1:
             self.select_tab(tab_id)
+            # tab_button.setChecked(True) # Also ensure button is checked
 
         return tab_widget
 
     def select_tab(self, tab_id: str):
-        """Select a tab"""
+        """Select a tab by its ID"""
         if tab_id not in self.tabs:
             return
 
-        # Hide all tabs
-        for tab_info in self.tabs.values():
-            tab_info['widget'].setVisible(False)
-            tab_info['button'].setChecked(False)
+        if self.current_tab == tab_id: # Already selected
+            # Ensure button is checked if somehow it got unchecked
+            if not self.tabs[tab_id]['button'].isChecked():
+                self.tabs[tab_id]['button'].setChecked(True)
+            return
 
-        # Show selected tab
-        selected_tab = self.tabs[tab_id]
-        selected_tab['widget'].setVisible(True)
-        selected_tab['button'].setChecked(True)
+        # Hide all tab widgets and uncheck buttons
+        for t_id, tab_info in self.tabs.items():
+            tab_info['widget'].setVisible(False)
+            if t_id != tab_id : # Don't uncheck the one we are about to select
+                 tab_info['button'].setChecked(False)
+
+
+        # Show selected tab widget and check its button
+        selected_tab_info = self.tabs[tab_id]
+        selected_tab_info['widget'].setVisible(True)
+        selected_tab_info['button'].setChecked(True) # Crucial for QButtonGroup
         self.current_tab = tab_id
 
-    def on_tab_changed(self, button: QPushButton):
-        """Handle tab change"""
+    def on_tab_button_clicked(self, button: QPushButton):
+        """Handle tab button click from QButtonGroup"""
         for tab_id, tab_info in self.tabs.items():
             if tab_info['button'] == button:
-                self.select_tab(tab_id)
+                if self.current_tab != tab_id: # Only select if it's a different tab
+                    self.select_tab(tab_id)
+                elif not button.isChecked(): # If clicked on active tab to uncheck (QButtonGroup might prevent this if exclusive)
+                    button.setChecked(True) # Keep it checked
                 break
+
 
     def setup_style(self):
         """Setup styling"""
@@ -708,26 +832,39 @@ class FluentRibbon(QWidget):
         self.setStyleSheet(f"""
             FluentRibbon {{
                 background-color: {theme.get_color('background').name()};
-                border-bottom: 2px solid {theme.get_color('primary').name()};
             }}
-            QFrame {{
+        """)
+        self.tab_header.setStyleSheet(f"""
+            QFrame#ribbonTabHeader {{
                 background-color: {theme.get_color('surface').name()};
-                border: none;
+                border-bottom: 1px solid {theme.get_color('border').name()};
             }}
-            QPushButton {{
+            /* Style for QPushButton within the tab_header */
+            QFrame#ribbonTabHeader > QPushButton {{
                 background-color: transparent;
                 border: none;
-                padding: 6px 16px;
-                color: {theme.get_color('text_primary').name()};
+                border-bottom: 2px solid transparent; /* For selected indicator */
+                padding: 0px 16px; /* top/bottom padding handled by fixed height */
+                margin-right: 2px; /* Small gap between tabs */
+                color: {theme.get_color('text_secondary').name()};
                 font-size: 12px;
-                font-weight: 500;
+                font-weight: 500; /* Medium */
+                min-height: 28px; /* Ensure text is vertically centered */
             }}
-            QPushButton:hover {{
+            QFrame#ribbonTabHeader > QPushButton:hover {{
                 background-color: {theme.get_color('accent_light').name()};
+                color: {theme.get_color('text_primary').name()};
             }}
-            QPushButton:checked {{
-                background-color: {theme.get_color('primary').name()};
-                color: white;
+            QFrame#ribbonTabHeader > QPushButton:checked {{
+                color: {theme.get_color('primary').name()};
+                border-bottom: 2px solid {theme.get_color('primary').name()};
+                font-weight: 600; /* Semibold */
+            }}
+        """)
+        self.tab_content.setStyleSheet(f"""
+            QFrame#ribbonTabContent {{
+                background-color: {theme.get_color('surface').name()}; /* Or background if tabs fill it */
+                border: none;
             }}
         """)
 
@@ -739,6 +876,7 @@ __all__ = [
     'FluentMenu',
     'FluentContextMenu',
     'FluentCommandPalette',
+    'RibbonGroupFrame', # Export new class
     'FluentRibbonTab',
     'FluentRibbon'
 ]

@@ -29,37 +29,44 @@ pip install -e ".[docs]"
 ## 🏗️ Component Categories
 
 ### 1. Data Visualization
+
 - **Charts**: Line, bar, pie, scatter plots
 - **Progress Components**: Progress rings, bars, indicators
 - **Sparklines**: Compact trend visualization
 
 ### 2. Data Entry
+
 - **Advanced Input**: Masked input, auto-complete
 - **Rich Text Editor**: WYSIWYG text editing
 - **Date/Time Pickers**: Calendar and time selection
 
 ### 3. Status & Notifications
+
 - **Status Indicators**: Health, connection, process status
 - **Progress Tracking**: Multi-step progress display
 - **Badges & Pills**: Count indicators and tags
 
 ### 4. Tree & Hierarchical Data
+
 - **Tree Widgets**: Expandable data structures
 - **Organization Charts**: Hierarchical relationships
 - **Breadcrumbs**: Navigation paths
 
 ### 5. Layout Containers
+
 - **Cards**: Content grouping
 - **Expanders**: Collapsible sections
 - **Splitters**: Resizable panels
 - **Info Bars**: Contextual messaging
 
 ### 6. Media Components
+
 - **Image Viewer**: Advanced image display
 - **Media Player**: Audio/video playback
 - **Content Viewer**: Document and file preview
 
 ### 7. Command Interface
+
 - **Command Bars**: Action organization
 - **Toolbars**: Tool grouping
 - **Ribbons**: Office-style interfaces
@@ -145,7 +152,7 @@ python build.py build
 
 ### Project Structure
 
-```
+```txt
 simple-fluent-widget/
 ├── components/           # Core UI components
 │   ├── basic/           # Basic widgets

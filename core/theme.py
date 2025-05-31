@@ -18,18 +18,18 @@ class ThemeMode(Enum):
 
 class FluentTheme(QObject):
     """**Fluent Design主题管理器**"""
-    
+
     # 主题改变信号
     theme_changed = Signal(str)  # theme_name
     mode_changed = Signal(ThemeMode)  # theme_mode
-    
+
     def __init__(self):
         super().__init__()
         self._current_mode = ThemeMode.LIGHT
         self._current_theme = "default"
         self._custom_colors = {}
         self.settings = QSettings("FluentUI", "Theme")
-        
+
         # **定义Fluent Design调色板**
         self._light_palette = {
             "primary": QColor("#0078d4"),
@@ -45,7 +45,7 @@ class FluentTheme(QObject):
             "accent_medium": QColor("#c7e0f4"),
             "accent_dark": QColor("#004578"),
         }
-        
+
         self._dark_palette = {
             "primary": QColor("#60cdff"),
             "secondary": QColor("#0078d4"),
@@ -60,18 +60,22 @@ class FluentTheme(QObject):
             "accent_medium": QColor("#1a3a5c"),
             "accent_dark": QColor("#60cdff"),
         }
-        
+
         self.load_settings()
-    
+
     def get_color(self, color_name: str) -> QColor:
         """**获取当前主题的颜色**"""
         if color_name in self._custom_colors:
             return self._custom_colors[color_name]
-        
-        palette = (self._light_palette if self._current_mode == ThemeMode.LIGHT 
-                  else self._dark_palette)
+
+        palette = (self._light_palette if self._current_mode == ThemeMode.LIGHT
+                   else self._dark_palette)
         return palette.get(color_name, QColor("#000000"))
-    
+
+    def get_theme_mode(self) -> ThemeMode:
+        """**获取当前主题模式**"""
+        return self._current_mode
+
     def set_theme_mode(self, mode: ThemeMode):
         """**设置主题模式**"""
         if self._current_mode != mode:
@@ -79,16 +83,16 @@ class FluentTheme(QObject):
             self.save_settings()
             self.mode_changed.emit(mode)
             self.theme_changed.emit(self._current_theme)
-    
+
     def set_custom_color(self, color_name: str, color: QColor):
         """**设置自定义颜色**"""
         self._custom_colors[color_name] = color
         self.theme_changed.emit(self._current_theme)
-    
+
     def get_style_sheet(self, component_type: str) -> str:
         """**获取组件样式表**"""
         return self._generate_component_style(component_type)
-    
+
     def _generate_component_style(self, component_type: str) -> str:
         """生成组件样式"""
         colors = {
@@ -99,10 +103,10 @@ class FluentTheme(QObject):
             "text_primary": self.get_color("text_primary").name(),
             "text_secondary": self.get_color("text_secondary").name(),
         }
-        
+
         # 根据组件类型返回对应的CSS样式
         return self._get_component_css(component_type, colors)
-    
+
     def _get_component_css(self, component_type: str, colors: Dict[str, str]) -> str:
         """获取组件CSS样式"""
         styles = {
@@ -143,12 +147,12 @@ class FluentTheme(QObject):
             """
         }
         return styles.get(component_type, "")
-    
+
     def save_settings(self):
         """**保存主题设置**"""
         self.settings.setValue("theme_mode", self._current_mode.value)
         self.settings.setValue("current_theme", self._current_theme)
-    
+
     def load_settings(self):
         """**加载主题设置**"""
         mode_value = self.settings.value("theme_mode", ThemeMode.LIGHT.value)

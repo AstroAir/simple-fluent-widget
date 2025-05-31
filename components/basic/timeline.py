@@ -298,8 +298,8 @@ class FluentTimelineItem(QFrame):
     def setContentWidget(self, widget: QWidget):
         """Set custom content widget"""
         if self._content_widget_internal:
-            FluentRevealEffect.fade_out(
-                self._content_widget_internal, duration=FluentAnimation.DURATION_FAST, delete_when_stopped=False)  # type: ignore
+            FluentAnimation.fade_out(
+                self._content_widget_internal, duration=FluentAnimation.DURATION_FAST)
             self._content_widget_internal.setParent(None)
             self._content_widget_internal.deleteLater()
         self._content_widget_internal = widget

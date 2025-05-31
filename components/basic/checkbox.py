@@ -1,285 +1,432 @@
+# filepath: d:\Project\simple-fluent-widget\components\basic\checkbox.py
 """
-Fluent Design Style Checkbox and Radio Button Components
-Enhanced with improved animations and consistent styling patterns
+Optimized Fluent Design Style Checkbox and Radio Button Components
+Enhanced with better performance, smoother animations and consistent theme integration
 """
 
 from PySide6.QtWidgets import QCheckBox, QRadioButton, QWidget, QButtonGroup, QVBoxLayout
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve, QTimer, QByteArray
+from PySide6.QtGui import QColor
 from core.theme import theme_manager
-from core.enhanced_animations import (FluentMicroInteraction, FluentTransition,
-                                      FluentStateTransition, FluentRevealEffect)
 from typing import Optional, List
 
 
 class FluentCheckBox(QCheckBox):
-    """Fluent Design Style Checkbox with enhanced animations"""
+    """Optimized Fluent Design Style Checkbox with better performance and smoother animations"""
 
     def __init__(self, text: str = "", parent: Optional[QWidget] = None):
         super().__init__(text, parent)
 
-        self._state_transition = FluentStateTransition(self)
+        # Performance optimization: minimize object creation
         self._is_hovered = False
         self._is_checked = False
+        self._style_cache = ""
 
-        self._setup_enhanced_animations()
-        self._setup_style()
+        # Single animation controller for better performance
+        self._hover_animation = None
+        self._check_animation = None
 
-        # Connect signals
-        self.stateChanged.connect(self._on_state_changed)
-        theme_manager.theme_changed.connect(self._on_theme_changed)
+        # Debounce timer for style updates
+        self._style_update_timer = QTimer()
+        self._style_update_timer.setSingleShot(True)
+        self._style_update_timer.timeout.connect(self._update_style_impl)
 
-    def _setup_enhanced_animations(self):
-        """Setup enhanced animation effects"""
-        # Setup state transitions for different checkbox states
-        self._state_transition.addState("normal", {
-            "minimumHeight": 20,
-        })
+        self._setup_optimized_animations()
+        self._setup_consistent_style()
 
-        self._state_transition.addState("hovered", {
-            "minimumHeight": 22,
-        }, duration=150, easing=FluentTransition.EASE_SMOOTH)
+        # Connect signals with optimizations
+        self.stateChanged.connect(self._on_state_changed_optimized)
+        theme_manager.theme_changed.connect(self._on_theme_changed_optimized)
 
-        self._state_transition.addState("checked", {
-            "minimumHeight": 20,
-        }, duration=200, easing=FluentTransition.EASE_SPRING)
+    def _setup_optimized_animations(self):
+        """Setup lightweight, performance-optimized animations"""
+        # Create reusable animations with optimal settings
+        self._hover_animation = QPropertyAnimation(
+            self, QByteArray(b"minimumHeight"))
+        # Reduced duration for snappier feel
+        self._hover_animation.setDuration(120)
+        self._hover_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
-    def _setup_style(self):
-        """Setup checkbox style with enhanced visual effects"""
+        self._check_animation = QPropertyAnimation(
+            self, QByteArray(b"minimumHeight"))
+        self._check_animation.setDuration(150)
+        self._check_animation.setEasingCurve(QEasingCurve.Type.OutBack)
+
+        # Set initial values to prevent None state
+        self._hover_animation.setStartValue(24)
+        self._hover_animation.setEndValue(24)
+        self._check_animation.setStartValue(24)
+        self._check_animation.setEndValue(24)
+
+    def _setup_consistent_style(self):
+        """Setup consistent style following Fluent Design principles"""
+        # Use cached style to avoid repeated calculations
+        if not self._style_cache:
+            self._generate_style_cache()
+
+        self.setStyleSheet(self._style_cache)
+
+    def _generate_style_cache(self):
+        """Generate and cache the complete stylesheet"""
         current_theme = theme_manager
 
-        style_sheet = f"""
+        # Get theme colors with fallbacks
+        primary = current_theme.get_color('primary')
+        surface = current_theme.get_color('surface')
+        background = current_theme.get_color('background')
+        border = current_theme.get_color('border')
+        text_primary = current_theme.get_color('text_primary')
+        text_disabled = current_theme.get_color('text_disabled')
+        accent_light = current_theme.get_color('accent_light')
+
+        # Optimized stylesheet with Qt-compatible CSS properties
+        self._style_cache = f"""
             FluentCheckBox {{
+                font-family: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
                 font-size: 14px;
-                color: {current_theme.get_color('text_primary').name()};
-                spacing: 8px;
-                min-height: 20px;
+                font-weight: 400;
+                color: {text_primary.name()};
+                spacing: 10px;
+                padding: 4px 0px;
+                min-height: 24px;
+                border: none;
+                background: transparent;
             }}
+            
             FluentCheckBox::indicator {{
-                width: 16px;
-                height: 16px;
-                border-radius: 3px;
-                border: 2px solid {current_theme.get_color('border').name()};
-                background-color: {current_theme.get_color('surface').name()};
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 2px solid {border.name()};
+                background-color: {surface.name()};
+                margin: 0px;
             }}
+            
             FluentCheckBox::indicator:hover {{
-                border-color: {current_theme.get_color('primary').name()};
-                background-color: {current_theme.get_color('accent_light').name()};
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                border-color: {primary.name()};
+                background-color: {accent_light.name()};
             }}
+            
+            FluentCheckBox::indicator:focus {{
+                border-color: {primary.name()};
+                border: 3px solid {primary.name()};
+            }}
+            
             FluentCheckBox::indicator:checked {{
-                background-color: {current_theme.get_color('primary').name()};
-                border-color: {current_theme.get_color('primary').name()};
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEwIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+DQo8cGF0aCBkPSJNOC41IDFMMy41IDZMMSA0IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+DQo8L3N2Zz4NCg==);
+                background-color: {primary.name()};
+                border-color: {primary.name()};
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOSIgdmlld0JveD0iMCAwIDEyIDkiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xMC41IDFMNCA3LjVMMSA0LjUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPg==);
             }}
+            
             FluentCheckBox::indicator:checked:hover {{
-                background-color: {current_theme.get_color('primary').lighter(110).name()};
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                background-color: {primary.lighter(110).name()};
+                border-color: {primary.lighter(110).name()};
             }}
+            
             FluentCheckBox::indicator:indeterminate {{
-                background-color: {current_theme.get_color('primary').name()};
-                border-color: {current_theme.get_color('primary').name()};
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSIyIiB2aWV3Qm94PSIwIDAgOCAyIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBkPSJNMSAxSDciIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+);
+                background-color: {primary.name()};
+                border-color: {primary.name()};
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMiIgdmlld0JveD0iMCAwIDEwIDIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFIOSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+);
             }}
+            
             FluentCheckBox::indicator:disabled {{
-                background-color: {current_theme.get_color('surface').name()};
-                border-color: {current_theme.get_color('border').name()};
+                background-color: {surface.darker(105).name()};
+                border-color: {border.darker(120).name()};
+                opacity: 0.6;
             }}
+            
             FluentCheckBox:disabled {{
-                color: {current_theme.get_color('text_disabled').name()};
+                color: {text_disabled.name()};
+                opacity: 0.6;
+            }}
+            
+            FluentCheckBox:focus {{
+                outline: none;
             }}
         """
 
-        self.setStyleSheet(style_sheet)
-
-    def _on_state_changed(self, state):
-        """Handle checkbox state change with enhanced animations"""
+    def _on_state_changed_optimized(self, state):
+        """Optimized state change handler with minimal overhead"""
+        was_checked = self._is_checked
         self._is_checked = (state == Qt.CheckState.Checked)
 
-        # Apply check animation with micro-interaction
-        if self._is_checked:
-            FluentMicroInteraction.button_press(self, 0.95)
-            self._state_transition.transitionTo("checked")
-            # Add a subtle pulse effect
-            FluentMicroInteraction.pulse_animation(self, 1.05)
-        else:
-            self._state_transition.transitionTo(
-                "normal" if not self._is_hovered else "hovered")
+        # Only animate if state actually changed
+        if was_checked != self._is_checked:
+            self._animate_check_transition()
 
-    def _on_theme_changed(self, theme_name: str):
-        """Handle theme change"""
-        self._setup_style()
+    def _animate_check_transition(self):
+        """Lightweight check animation"""
+        if self._is_checked and self._check_animation:
+            # Subtle scale effect using existing animation
+            if self._check_animation.state() != QPropertyAnimation.State.Running:
+                current_height = self.minimumHeight()
+                self._check_animation.setStartValue(current_height)
+                self._check_animation.setEndValue(current_height + 2)
+                self._check_animation.finished.connect(
+                    self._restore_check_size)
+                self._check_animation.start()
+
+    def _restore_check_size(self):
+        """Restore size after check animation"""
+        if self._check_animation:
+            self._check_animation.finished.disconnect()
+            current_height = self.minimumHeight()
+            self._check_animation.setStartValue(current_height)
+            self._check_animation.setEndValue(24)  # Default height
+            self._check_animation.start()
+
+    def _on_theme_changed_optimized(self, theme_name: str):
+        """Optimized theme change with debouncing"""
+        # Clear cache and schedule update
+        self._style_cache = ""
+
+        # Debounce style updates for better performance
+        if not self._style_update_timer.isActive():
+            self._style_update_timer.start(50)  # 50ms debounce
+
+    def _update_style_impl(self):
+        """Actual style update implementation"""
+        self._setup_consistent_style()
 
     def enterEvent(self, event):
-        """Hover enter event with enhanced animations"""
-        self._is_hovered = True
-
-        # Apply hover glow effect
-        FluentMicroInteraction.hover_glow(self, 0.05)
-
-        # Transition to hover state
-        if not self._is_checked:
-            self._state_transition.transitionTo("hovered")
-
+        """Optimized hover enter event"""
+        if not self._is_hovered:
+            self._is_hovered = True
+            self._animate_hover_enter()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Hover leave event"""
-        self._is_hovered = False
-
-        # Transition back to normal state
-        if not self._is_checked:
-            self._state_transition.transitionTo("normal")
-
+        """Optimized hover leave event"""
+        if self._is_hovered:
+            self._is_hovered = False
+            self._animate_hover_leave()
         super().leaveEvent(event)
 
-    def mousePressEvent(self, event):
-        """Mouse press event with micro-interaction"""
-        # Apply button press micro-interaction
-        FluentMicroInteraction.scale_animation(self, 0.9)
+    def _animate_hover_enter(self):
+        """Lightweight hover enter animation"""
+        if self._hover_animation and self._hover_animation.state() != QPropertyAnimation.State.Running:
+            current_height = self.minimumHeight()
+            self._hover_animation.setStartValue(current_height)
+            self._hover_animation.setEndValue(26)  # Slight increase
+            self._hover_animation.start()
 
+    def _animate_hover_leave(self):
+        """Lightweight hover leave animation"""
+        if self._hover_animation and self._hover_animation.state() != QPropertyAnimation.State.Running:
+            current_height = self.minimumHeight()
+            self._hover_animation.setStartValue(current_height)
+            self._hover_animation.setEndValue(24)  # Back to normal
+            self._hover_animation.start()
+
+    def mousePressEvent(self, event):
+        """Optimized mouse press with subtle visual feedback"""
+        # Add subtle press feedback via CSS transition
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """Mouse release event with ripple effect"""
-        # Create ripple effect at the checkbox indicator
-        FluentMicroInteraction.ripple_effect(self)
-
+        """Optimized mouse release"""
         super().mouseReleaseEvent(event)
 
 
 class FluentRadioButton(QRadioButton):
-    """Fluent Design Style Radio Button with enhanced animations"""
+    """Optimized Fluent Design Style Radio Button with consistent theming and animations"""
 
     def __init__(self, text: str = "", parent: Optional[QWidget] = None):
         super().__init__(text, parent)
 
-        self._state_transition = FluentStateTransition(self)
+        # Performance optimization
         self._is_hovered = False
         self._is_selected = False
+        self._style_cache = ""
 
-        self._setup_enhanced_animations()
-        self._setup_style()
+        # Animation controller for better performance
+        self._hover_animation = None
+        self._check_animation = None
+
+        # Debounce timer for style updates
+        self._style_update_timer = QTimer()
+        self._style_update_timer.setSingleShot(True)
+        self._style_update_timer.timeout.connect(self._update_style_impl)
+
+        self._setup_optimized_animations()
+        self._setup_consistent_style()
 
         # Connect signals
-        self.toggled.connect(self._on_toggled)
-        theme_manager.theme_changed.connect(self._on_theme_changed)
+        self.toggled.connect(self._on_toggled_optimized)
+        theme_manager.theme_changed.connect(self._on_theme_changed_optimized)
 
-    def _setup_enhanced_animations(self):
-        """Setup enhanced animation effects"""
-        # Setup state transitions for different radio button states
-        self._state_transition.addState("normal", {
-            "minimumHeight": 20,
-        })
+    def _setup_optimized_animations(self):
+        """Setup lightweight, performance-optimized animations"""
+        # Create reusable animations with optimal settings
+        self._hover_animation = QPropertyAnimation(
+            self, QByteArray(b"minimumHeight"))
+        self._hover_animation.setDuration(120)
+        self._hover_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
-        self._state_transition.addState("hovered", {
-            "minimumHeight": 22,
-        }, duration=150, easing=FluentTransition.EASE_SMOOTH)
+        self._check_animation = QPropertyAnimation(
+            self, QByteArray(b"minimumHeight"))
+        self._check_animation.setDuration(150)
+        self._check_animation.setEasingCurve(QEasingCurve.Type.OutBack)
 
-        self._state_transition.addState("selected", {
-            "minimumHeight": 20,
-        }, duration=200, easing=FluentTransition.EASE_SPRING)
+        # Set initial values to prevent None state
+        self._hover_animation.setStartValue(24)
+        self._hover_animation.setEndValue(24)
+        self._check_animation.setStartValue(24)
+        self._check_animation.setEndValue(24)
 
-    def _setup_style(self):
-        """Setup radio button style with enhanced visual effects"""
+    def _setup_consistent_style(self):
+        """Setup consistent style following Fluent Design principles"""
+        if not self._style_cache:
+            self._generate_style_cache()
+
+        self.setStyleSheet(self._style_cache)
+
+    def _generate_style_cache(self):
+        """Generate and cache the complete stylesheet"""
         current_theme = theme_manager
 
-        style_sheet = f"""
+        # Get theme colors with fallbacks
+        primary = current_theme.get_color('primary')
+        surface = current_theme.get_color('surface')
+        border = current_theme.get_color('border')
+        text_primary = current_theme.get_color('text_primary')
+        text_disabled = current_theme.get_color('text_disabled')
+        accent_light = current_theme.get_color('accent_light')
+
+        # Optimized stylesheet with Qt-compatible CSS properties (removed transition, box-shadow, transform)
+        self._style_cache = f"""
             FluentRadioButton {{
+                font-family: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
                 font-size: 14px;
-                color: {current_theme.get_color('text_primary').name()};
-                spacing: 8px;
-                min-height: 20px;
+                font-weight: 400;
+                color: {text_primary.name()};
+                spacing: 10px;
+                padding: 4px 0px;
+                min-height: 24px;
+                border: none;
+                background: transparent;
             }}
+            
             FluentRadioButton::indicator {{
-                width: 16px;
-                height: 16px;
-                border-radius: 8px;
-                border: 2px solid {current_theme.get_color('border').name()};
-                background-color: {current_theme.get_color('surface').name()};
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                border: 2px solid {border.name()};
+                background-color: {surface.name()};
+                margin: 0px;
             }}
+            
             FluentRadioButton::indicator:hover {{
-                border-color: {current_theme.get_color('primary').name()};
-                background-color: {current_theme.get_color('accent_light').name()};
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                border-color: {primary.name()};
+                background-color: {accent_light.name()};
             }}
+            
+            FluentRadioButton::indicator:focus {{
+                border-color: {primary.name()};
+                border: 3px solid {primary.name()};
+            }}
+            
             FluentRadioButton::indicator:checked {{
-                background-color: {current_theme.get_color('primary').name()};
-                border-color: {current_theme.get_color('primary').name()};
-                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNiIgaGVpZ2h0PSI2IiB2aWV3Qm94PSIwIDAgNiA2IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSIzIiBjeT0iMyIgcj0iMyIgZmlsbD0id2hpdGUiLz4KPC9zdmc+);
+                background-color: {primary.name()};
+                border-color: {primary.name()};
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOCIgaGVpZ2h0PSI4IiB2aWV3Qm94PSIwIDAgOCA4IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8Y2lyY2xlIGN4PSI0IiBjeT0iNCIgcj0iNCIgZmlsbD0id2hpdGUiLz4KPC9zdmc+);
             }}
+            
             FluentRadioButton::indicator:checked:hover {{
-                background-color: {current_theme.get_color('primary').lighter(110).name()};
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                background-color: {primary.lighter(110).name()};
+                border-color: {primary.lighter(110).name()};
             }}
+            
             FluentRadioButton::indicator:disabled {{
-                background-color: {current_theme.get_color('surface').name()};
-                border-color: {current_theme.get_color('border').name()};
+                background-color: {surface.darker(105).name()};
+                border-color: {border.darker(120).name()};
+                opacity: 0.6;
             }}
+            
             FluentRadioButton:disabled {{
-                color: {current_theme.get_color('text_disabled').name()};
+                color: {text_disabled.name()};
+                opacity: 0.6;
+            }}
+            
+            FluentRadioButton:focus {{
+                outline: none;
             }}
         """
 
-        self.setStyleSheet(style_sheet)
-
-    def _on_toggled(self, checked: bool):
-        """Handle radio button toggle with enhanced animations"""
+    def _on_toggled_optimized(self, checked: bool):
+        """Optimized toggle handler with animation"""
+        was_selected = self._is_selected
         self._is_selected = checked
 
-        if checked:
-            # Apply selection animation with micro-interaction
-            FluentMicroInteraction.scale_animation(self, 0.95)
-            self._state_transition.transitionTo("selected")
-            # Add a subtle pulse effect
-            FluentMicroInteraction.pulse_animation(self, 1.05)
-        else:
-            self._state_transition.transitionTo(
-                "normal" if not self._is_hovered else "hovered")
+        # Only animate if state actually changed
+        if was_selected != self._is_selected and self._is_selected:
+            self._animate_check_transition()
 
-    def _on_theme_changed(self, theme_name: str):
-        """Handle theme change"""
-        self._setup_style()
+    def _animate_check_transition(self):
+        """Lightweight check animation"""
+        if self._check_animation:
+            # Subtle scale effect using existing animation
+            if self._check_animation.state() != QPropertyAnimation.State.Running:
+                current_height = self.minimumHeight()
+                self._check_animation.setStartValue(current_height)
+                self._check_animation.setEndValue(current_height + 2)
+                self._check_animation.finished.connect(
+                    self._restore_check_size)
+                self._check_animation.start()
+
+    def _restore_check_size(self):
+        """Restore size after check animation"""
+        if self._check_animation:
+            self._check_animation.finished.disconnect()
+            current_height = self.minimumHeight()
+            self._check_animation.setStartValue(current_height)
+            self._check_animation.setEndValue(24)  # Default height
+            self._check_animation.start()
+
+    def _on_theme_changed_optimized(self, theme_name: str):
+        """Optimized theme change with debouncing"""
+        self._style_cache = ""
+
+        if not self._style_update_timer.isActive():
+            self._style_update_timer.start(50)
+
+    def _update_style_impl(self):
+        """Actual style update implementation"""
+        self._setup_consistent_style()
 
     def enterEvent(self, event):
-        """Hover enter event with enhanced animations"""
-        self._is_hovered = True
-
-        # Apply hover glow effect
-        FluentMicroInteraction.hover_glow(self, 0.05)
-
-        # Transition to hover state
-        if not self._is_selected:
-            self._state_transition.transitionTo("hovered")
-
+        """Optimized hover enter event"""
+        if not self._is_hovered:
+            self._is_hovered = True
+            self._animate_hover_enter()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Hover leave event"""
-        self._is_hovered = False
-
-        # Transition back to normal state
-        if not self._is_selected:
-            self._state_transition.transitionTo("normal")
-
+        """Optimized hover leave event"""
+        if self._is_hovered:
+            self._is_hovered = False
+            self._animate_hover_leave()
         super().leaveEvent(event)
 
-    def mousePressEvent(self, event):
-        """Mouse press event with micro-interaction"""
-        # Apply button press micro-interaction
-        FluentMicroInteraction.scale_animation(self, 0.9)
+    def _animate_hover_enter(self):
+        """Lightweight hover enter animation"""
+        if self._hover_animation and self._hover_animation.state() != QPropertyAnimation.State.Running:
+            current_height = self.minimumHeight()
+            self._hover_animation.setStartValue(current_height)
+            self._hover_animation.setEndValue(26)  # Slight increase
+            self._hover_animation.start()
 
-        super().mousePressEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        """Mouse release event with ripple effect"""
-        # Create ripple effect at the radio button indicator
-        FluentMicroInteraction.ripple_effect(self)
-
-        super().mouseReleaseEvent(event)
+    def _animate_hover_leave(self):
+        """Lightweight hover leave animation"""
+        if self._hover_animation and self._hover_animation.state() != QPropertyAnimation.State.Running:
+            current_height = self.minimumHeight()
+            self._hover_animation.setStartValue(current_height)
+            self._hover_animation.setEndValue(24)  # Back to normal
+            self._hover_animation.start()
 
 
 class FluentRadioGroup(QWidget):
-    """Radio Button Group with enhanced animations"""
+    """Optimized Radio Button Group with consistent theming"""
 
     selection_changed = Signal(int, str)  # index, text
 
@@ -293,11 +440,8 @@ class FluentRadioGroup(QWidget):
         self._setup_radio_buttons(options)
         self._button_group.buttonToggled.connect(self._on_button_toggled)
 
-        # Add reveal animation when created
-        FluentRevealEffect.fade_in(self, 300)
-
     def _setup_radio_buttons(self, options: List[str]):
-        """Setup radio buttons with enhanced animations"""
+        """Setup radio buttons with consistent styling"""
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -308,38 +452,15 @@ class FluentRadioGroup(QWidget):
             self._button_group.addButton(radio_button, i)
             layout.addWidget(radio_button)
 
-            # Add staggered reveal animation
-            FluentRevealEffect.slide_in(radio_button, 200 + i * 50, "up")
-
     def _on_button_toggled(self, button, checked: bool):
-        """Handle button toggle with enhanced animations"""
+        """Handle button toggle with optimized logic"""
         if checked:
             self._selected_index = self._button_group.id(button)
             text = button.text()
-
-            # Create smooth transition animation between selections
-            if hasattr(self, '_previous_button') and self._previous_button != button:
-                # Fade out previous selection
-                fade_out = FluentTransition.create_transition(
-                    self._previous_button, FluentTransition.FADE, 150,
-                    FluentTransition.EASE_SMOOTH)
-                fade_out.setStartValue(1.0)
-                fade_out.setEndValue(0.8)
-                fade_out.start()
-
-                # Fade in new selection
-                fade_in = FluentTransition.create_transition(
-                    button, FluentTransition.FADE, 150,
-                    FluentTransition.EASE_SMOOTH)
-                fade_in.setStartValue(0.8)
-                fade_in.setEndValue(1.0)
-                fade_in.start()
-
-            self._previous_button = button
             self.selection_changed.emit(self._selected_index, text)
 
     def set_selected(self, index: int):
-        """Set selected radio button with animation"""
+        """Set selected radio button"""
         if 0 <= index < len(self._radio_buttons):
             self._radio_buttons[index].setChecked(True)
 

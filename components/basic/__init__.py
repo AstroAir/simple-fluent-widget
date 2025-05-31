@@ -4,7 +4,7 @@ Basic Fluent Design Components
 
 from .button import FluentButton, FluentIconButton, FluentToggleButton
 from .textbox import FluentLineEdit, FluentTextEdit, FluentPasswordEdit, FluentSearchBox
-from .checkbox import FluentCheckBox, FluentRadioButton, FluentRadioGroup, FluentSwitch
+from .checkbox import FluentCheckBox, FluentRadioButton, FluentRadioGroup
 from .tooltip import FluentTooltip, TooltipMixin
 from .rating import FluentRating
 from .tabs import FluentTabWidget, FluentTabButton
@@ -21,6 +21,7 @@ from .badge import FluentBadge, FluentTag
 from .pagination import FluentPagination, FluentSimplePagination
 from .label import (FluentLabel, FluentIconLabel, FluentStatusLabel, 
                     FluentLinkLabel, FluentLabelGroup)
+from .switch import FluentSwitch
 
 __all__ = [
     'FluentButton', 'FluentIconButton', 'FluentToggleButton',
