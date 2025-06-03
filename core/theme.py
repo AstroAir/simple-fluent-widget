@@ -164,5 +164,23 @@ class FluentTheme(QObject):
         self._current_theme = str(self.settings.value("current_theme", "default"))
 
 
-# 全局主题实例
-theme_manager = FluentTheme()
+# 全局主题实例 - 使用懒加载避免在QApplication创建前初始化QObject
+_theme_manager = None
+
+def get_theme_manager():
+    """获取主题管理器实例（懒加载）"""
+    global _theme_manager
+    if _theme_manager is None:
+        _theme_manager = FluentTheme()
+    return _theme_manager
+
+# 保持向后兼容性的属性访问
+class ThemeManagerProxy:
+    """主题管理器代理，提供懒加载功能"""
+    def __getattr__(self, name):
+        return getattr(get_theme_manager(), name)
+    
+    def __setattr__(self, name, value):
+        setattr(get_theme_manager(), name, value)
+
+theme_manager = ThemeManagerProxy()

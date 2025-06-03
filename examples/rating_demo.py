@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayo
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QPalette, QColor
 
-from components.basic.rating_enhanced import EnhancedFluentRating
+from components.basic.rating import EnhancedFluentRating
 from core.theme import theme_manager, ThemeMode
 
 
