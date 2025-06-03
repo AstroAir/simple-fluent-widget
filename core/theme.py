@@ -76,6 +76,10 @@ class FluentTheme(QObject):
         """**获取当前主题模式**"""
         return self._current_mode
 
+    def get_current_theme(self) -> str:
+        """**获取当前主题名称**"""
+        return self._current_theme
+
     def set_theme_mode(self, mode: ThemeMode):
         """**设置主题模式**"""
         if self._current_mode != mode:
@@ -157,7 +161,7 @@ class FluentTheme(QObject):
         """**加载主题设置**"""
         mode_value = self.settings.value("theme_mode", ThemeMode.LIGHT.value)
         self._current_mode = ThemeMode(mode_value)
-        self._current_theme = self.settings.value("current_theme", "default")
+        self._current_theme = str(self.settings.value("current_theme", "default"))
 
 
 # 全局主题实例

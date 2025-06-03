@@ -96,13 +96,11 @@ class FluentSequence(QObject):
     """Manages complex animation sequences"""
 
     finished = Signal()
-    _dummy_value_internal: int = 0
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._sequence = QSequentialAnimationGroup()
         self._sequence.finished.connect(self.finished)
-        self._dummy_value_internal = 0
 
     def addAnimation(self, animation: QPropertyAnimation):
         """Add animation to sequence"""
@@ -115,33 +113,16 @@ class FluentSequence(QObject):
 
     def addCallback(self, callback: Callable):
         """Add callback function to sequence"""
-        # Create a dummy animation that triggers callback when finished
-        # A more direct way if available, or use a QTimer if sequence doesn't support direct callbacks well.
-        # However, QSequentialAnimationGroup can run functions via a QTimer or a custom QAbstractAnimation.
-        # For simplicity, connecting to a zero-duration animation's finished signal is a common workaround.
-        # A more robust way is to use QTimer.singleShot(0, callback) if the timing is not critical
-        # or to subclass QAbstractAnimation for precise callback timing.
-        # The current approach of a 1ms dummy animation is acceptable for many cases.
-        # Dummy animation needs a QObject target
-        dummy = QPropertyAnimation(self)
-        dummy.setDuration(1)  # Minimal duration
-        # Property name for animation
-        dummy.setPropertyName(QByteArray(b"dummy_value"))
-        dummy.setStartValue(0)
-        dummy.setEndValue(1)
-        dummy.finished.connect(callback)
-        self._sequence.addAnimation(dummy)
-
-    # Dummy property for the callback animation
-    def get_dummy_value(self) -> int:
-        return self._dummy_value_internal
-
-    def set_dummy_value(self, value: int):
-        self._dummy_value_internal = value
-
-    # Define the Qt property using the getter and setter
-    dummy_value = Property(int, get_dummy_value,
-                           set_dummy_value)  # type: ignore
+        # Use QTimer instead of dummy animation to avoid target issues
+        def timer_callback():
+            try:
+                callback()
+            except Exception as e:
+                print(f"FluentSequence callback error: {e}")
+          # Create a minimal pause followed by timer callback
+        self._sequence.addPause(1)  # 1ms pause
+        # Schedule callback to run after the pause
+        QTimer.singleShot(1, timer_callback)
 
     def start(self):
         """Start the sequence"""
@@ -177,116 +158,145 @@ class FluentParallel(QObject):
 
 class FluentMicroInteraction:
     """Micro-interactions for enhanced user feedback"""
-
+    
     @staticmethod
     def button_press(button: QWidget, scale: float = 0.95):
         """Micro-interaction for button press"""
-        original_size = button.size()
-        pressed_size = original_size * scale
+        # Validate target widget
+        if not button or button is None:
+            return None
+            
+        try:
+            original_size = button.size()
+            pressed_size = original_size * scale
 
-        # Press animation
-        press_anim = QPropertyAnimation(button, QByteArray(b"geometry"))
-        press_anim.setDuration(FluentAnimation.DURATION_ULTRA_FAST)
-        press_anim.setEasingCurve(FluentTransition.EASE_CRISP)
+            # Press animation
+            press_anim = QPropertyAnimation(button, QByteArray(b"geometry"))
+            press_anim.setDuration(FluentAnimation.DURATION_ULTRA_FAST)
+            press_anim.setEasingCurve(FluentTransition.EASE_CRISP)
 
-        # Calculate new geometry
-        original_rect = button.geometry()
-        size_diff = original_size - pressed_size
-        new_rect = QRect(
-            original_rect.x() + size_diff.width() // 2,
-            original_rect.y() + size_diff.height() // 2,
-            pressed_size.width(),
-            pressed_size.height()
-        )
+            # Calculate new geometry
+            original_rect = button.geometry()
+            size_diff = original_size - pressed_size
+            new_rect = QRect(
+                original_rect.x() + size_diff.width() // 2,
+                original_rect.y() + size_diff.height() // 2,
+                pressed_size.width(),
+                pressed_size.height()
+            )
 
-        press_anim.setStartValue(original_rect)
-        press_anim.setEndValue(new_rect)
+            press_anim.setStartValue(original_rect)
+            press_anim.setEndValue(new_rect)
 
-        # Release animation
-        release_anim = QPropertyAnimation(button, QByteArray(b"geometry"))
-        release_anim.setDuration(FluentAnimation.DURATION_FAST)
-        release_anim.setEasingCurve(FluentTransition.EASE_SPRING)
-        release_anim.setStartValue(new_rect)
-        release_anim.setEndValue(original_rect)
+            # Release animation
+            release_anim = QPropertyAnimation(button, QByteArray(b"geometry"))
+            release_anim.setDuration(FluentAnimation.DURATION_FAST)
+            release_anim.setEasingCurve(FluentTransition.EASE_SPRING)
+            release_anim.setStartValue(new_rect)
+            release_anim.setEndValue(original_rect)
 
-        # Sequence
-        sequence = QSequentialAnimationGroup(
-            button)  # Set parent for auto-deletion
-        sequence.addAnimation(press_anim)
-        sequence.addAnimation(release_anim)
-        # Ensure it's deleted after running
-        sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
-
-        return sequence
+            # Sequence
+            sequence = QSequentialAnimationGroup(
+                button)  # Set parent for auto-deletion
+            sequence.addAnimation(press_anim)
+            sequence.addAnimation(release_anim)
+            # Ensure it's deleted after running
+            sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            return sequence
+        except Exception as e:
+            print(f"FluentMicroInteraction.button_press error: {e}")
+            return None
 
     @staticmethod
     def hover_glow(widget: QWidget, intensity: float = 0.2):
         """Add subtle glow effect on hover"""
-        effect = widget.graphicsEffect()
-        if not isinstance(effect, QGraphicsOpacityEffect):
-            effect = QGraphicsOpacityEffect(widget)
-            widget.setGraphicsEffect(effect)
+        # Validate target widget
+        if not widget or widget is None:
+            return None
+            
+        try:
+            effect = widget.graphicsEffect()
+            if not isinstance(effect, QGraphicsOpacityEffect):
+                effect = QGraphicsOpacityEffect(widget)
+                widget.setGraphicsEffect(effect)
 
-        glow_in = QPropertyAnimation(effect, QByteArray(b"opacity"))
-        glow_in.setDuration(FluentAnimation.DURATION_FAST)
-        glow_in.setEasingCurve(FluentTransition.EASE_SMOOTH)
-        glow_in.setStartValue(1.0)  # Assuming current opacity is 1.0
-        glow_in.setEndValue(min(1.0, 1.0 + intensity if intensity >=
-                            0 else 1.0 - abs(intensity)))  # Clamp opacity
-
-        return glow_in
+            glow_in = QPropertyAnimation(effect, QByteArray(b"opacity"))
+            glow_in.setDuration(FluentAnimation.DURATION_FAST)
+            glow_in.setEasingCurve(FluentTransition.EASE_SMOOTH)
+            glow_in.setStartValue(1.0)  # Assuming current opacity is 1.0
+            glow_in.setEndValue(min(1.0, 1.0 + intensity if intensity >=
+                                0 else 1.0 - abs(intensity)))  # Clamp opacity            return glow_in
+        except Exception as e:
+            print(f"FluentMicroInteraction.hover_glow error: {e}")
+            return None
 
     @staticmethod
-    def scale_animation(widget: QWidget, scale: float = 0.95) -> QPropertyAnimation:
+    def scale_animation(widget: QWidget, scale: float = 0.95):
         """Create a simple scale animation"""
-        original_rect = widget.geometry()
-        scaled_size = original_rect.size() * scale
-        new_rect = QRect(
-            original_rect.x() + (original_rect.width() - scaled_size.width()) // 2,
-            original_rect.y() + (original_rect.height() - scaled_size.height()) // 2,
-            scaled_size.width(),
-            scaled_size.height()
-        )
+        # Validate target widget
+        if not widget or widget is None:
+            return None
+            
+        try:
+            original_rect = widget.geometry()
+            scaled_size = original_rect.size() * scale
+            new_rect = QRect(
+                original_rect.x() + (original_rect.width() - scaled_size.width()) // 2,
+                original_rect.y() + (original_rect.height() - scaled_size.height()) // 2,
+                scaled_size.width(),
+                scaled_size.height()
+            )
 
-        anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
-        anim.setDuration(FluentAnimation.DURATION_FAST)
-        anim.setEasingCurve(FluentTransition.EASE_SPRING)
-        anim.setStartValue(original_rect)
-        anim.setEndValue(new_rect)
-        anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
-        return anim
+            anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
+            anim.setDuration(FluentAnimation.DURATION_FAST)
+            anim.setEasingCurve(FluentTransition.EASE_SPRING)
+            anim.setStartValue(original_rect)
+            anim.setEndValue(new_rect)
+            anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            return anim
+        except Exception as e:
+            print(f"FluentMicroInteraction.scale_animation error: {e}")
+            return None
 
     @staticmethod
-    def pulse_animation(widget: QWidget, scale: float = 1.05) -> QSequentialAnimationGroup:
+    def pulse_animation(widget: QWidget, scale: float = 1.05):
         """Create a pulse animation effect"""
-        original_rect = widget.geometry()
-        expanded_rect = QRect(
-            int(original_rect.x() - (original_rect.width() * (scale - 1)) // 2),
-            int(original_rect.y() - (original_rect.height() * (scale - 1)) // 2),
-            int(original_rect.width() * scale),
-            int(original_rect.height() * scale)
-        )
+        # Validate target widget
+        if not widget or widget is None:
+            return None
+            
+        try:
+            original_rect = widget.geometry()
+            expanded_rect = QRect(
+                int(original_rect.x() - (original_rect.width() * (scale - 1)) // 2),
+                int(original_rect.y() - (original_rect.height() * (scale - 1)) // 2),
+                int(original_rect.width() * scale),
+                int(original_rect.height() * scale)
+            )
 
-        sequence = QSequentialAnimationGroup(widget)
+            sequence = QSequentialAnimationGroup(widget)
 
-        # Expand animation
-        expand_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
-        expand_anim.setDuration(FluentAnimation.DURATION_FAST)
-        expand_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
-        expand_anim.setStartValue(original_rect)
-        expand_anim.setEndValue(expanded_rect)
-        sequence.addAnimation(expand_anim)
+            # Expand animation
+            expand_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
+            expand_anim.setDuration(FluentAnimation.DURATION_FAST)
+            expand_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+            expand_anim.setStartValue(original_rect)
+            expand_anim.setEndValue(expanded_rect)
+            sequence.addAnimation(expand_anim)
 
-        # Contract animation
-        contract_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
-        contract_anim.setDuration(FluentAnimation.DURATION_FAST)
-        contract_anim.setEasingCurve(FluentTransition.EASE_SPRING)
-        contract_anim.setStartValue(expanded_rect)
-        contract_anim.setEndValue(original_rect)
-        sequence.addAnimation(contract_anim)
+            # Contract animation
+            contract_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
+            contract_anim.setDuration(FluentAnimation.DURATION_FAST)
+            contract_anim.setEasingCurve(FluentTransition.EASE_SPRING)
+            contract_anim.setStartValue(expanded_rect)
+            contract_anim.setEndValue(original_rect)
+            sequence.addAnimation(contract_anim)
 
-        sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
-        return sequence
+            sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            return sequence
+        except Exception as e:
+            print(f"FluentMicroInteraction.pulse_animation error: {e}")
+            return None
 
     @staticmethod
     def shake_animation(widget: QWidget, intensity: float = 5) -> QSequentialAnimationGroup:
@@ -347,33 +357,41 @@ class FluentMicroInteraction:
         return expand_anim  # Return the first animation for type consistency
 
     @staticmethod
-    def ripple_effect(widget: QWidget) -> QSequentialAnimationGroup:
+    def ripple_effect(widget: QWidget):
         """Create ripple effect at specified position"""
-        # This would typically involve creating a temporary widget overlay
-        # For now, we'll simulate with a scale animation
-        ripple_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
-        ripple_anim.setDuration(FluentAnimation.DURATION_MEDIUM)
-        ripple_anim.setEasingCurve(FluentTransition.EASE_ELASTIC)
+        # Validate target widget
+        if not widget or widget is None:
+            return None
+            
+        try:
+            # This would typically involve creating a temporary widget overlay
+            # For now, we'll simulate with a scale animation
+            ripple_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
+            ripple_anim.setDuration(FluentAnimation.DURATION_MEDIUM)
+            ripple_anim.setEasingCurve(FluentTransition.EASE_ELASTIC)
 
-        original_rect = widget.geometry()
-        expanded_rect = original_rect.adjusted(-5, -5, 5, 5)
+            original_rect = widget.geometry()
+            expanded_rect = original_rect.adjusted(-5, -5, 5, 5)
 
-        ripple_anim.setStartValue(original_rect)
-        ripple_anim.setEndValue(expanded_rect)
+            ripple_anim.setStartValue(original_rect)
+            ripple_anim.setEndValue(expanded_rect)
 
-        # Return to normal
-        return_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
-        return_anim.setDuration(FluentAnimation.DURATION_MEDIUM)
-        return_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
-        return_anim.setStartValue(expanded_rect)
-        return_anim.setEndValue(original_rect)
+            # Return to normal
+            return_anim = QPropertyAnimation(widget, QByteArray(b"geometry"))
+            return_anim.setDuration(FluentAnimation.DURATION_MEDIUM)
+            return_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+            return_anim.setStartValue(expanded_rect)
+            return_anim.setEndValue(original_rect)
 
-        sequence = QSequentialAnimationGroup(widget)  # Set parent
-        sequence.addAnimation(ripple_anim)
-        sequence.addAnimation(return_anim)
-        sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            sequence = QSequentialAnimationGroup(widget)  # Set parent
+            sequence.addAnimation(ripple_anim)
+            sequence.addAnimation(return_anim)
+            sequence.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
 
-        return sequence
+            return sequence
+        except Exception as e:
+            print(f"FluentMicroInteraction.ripple_effect error: {e}")
+            return None
 
 
 class FluentStateTransition:

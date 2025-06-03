@@ -16,7 +16,7 @@ from .timeline import FluentTimeline, FluentTimelineItem
 from .switch import FluentSwitch as FluentModernSwitch, FluentSwitchGroup
 from .loading import (FluentSpinner, FluentDotLoader, FluentProgressRing, 
                       FluentLoadingOverlay, FluentPulseLoader)
-from .alert import FluentAlert, FluentNotification, FluentMessageBar, AlertType
+from .alert import EnhancedFluentAlert as FluentAlert, EnhancedFluentNotification as FluentNotification, FluentMessageBar, AlertType
 from .badge import FluentBadge, FluentTag
 from .pagination import FluentPagination, FluentSimplePagination
 from .label import (FluentLabel, FluentIconLabel, FluentStatusLabel, 

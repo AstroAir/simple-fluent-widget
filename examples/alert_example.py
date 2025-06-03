@@ -13,8 +13,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 
-from components.basic.alert import (FluentAlert, FluentNotification,
-                                    FluentMessageBar, AlertType)
+from components.basic.alert import (EnhancedFluentAlert, EnhancedFluentNotification,
+                                    EnhancedFluentNotification, AlertType)
 from core.theme import theme_manager
 
 
@@ -558,7 +558,7 @@ class AlertDemoWidget(QWidget):
         ) if self.alert_action_check.isChecked() else ""
         timeout = self.alert_timeout_spin.value()
 
-        alert = FluentAlert(
+        alert = EnhancedFluentAlert(
             title=title,
             message=message,
             alert_type=alert_type,
@@ -579,7 +579,7 @@ class AlertDemoWidget(QWidget):
 
     def _create_predefined_alert(self, alert_type, title, message):
         """Create a predefined alert"""
-        alert = FluentAlert(
+        alert = EnhancedFluentAlert(
             title=title,
             message=message,
             alert_type=alert_type,
@@ -608,7 +608,7 @@ class AlertDemoWidget(QWidget):
         clickable = self.notif_clickable_check.isChecked()
         timeout = self.notif_timeout_spin.value()
 
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             title=title,
             message=message,
             notification_type=notif_type,
@@ -643,7 +643,7 @@ class AlertDemoWidget(QWidget):
 
     def _create_timed_notification(self, title, message):
         """Create a timed notification"""
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             title=title,
             message=message,
             notification_type=AlertType.INFO,
@@ -667,7 +667,7 @@ class AlertDemoWidget(QWidget):
 
     def _create_mixed_notification(self, title, message, notif_type):
         """Create a mixed type notification"""
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             title=title,
             message=message,
             notification_type=notif_type,
@@ -688,7 +688,7 @@ class AlertDemoWidget(QWidget):
                  AlertType.WARNING, AlertType.ERROR]
         notif_type = types[index % len(types)]
 
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             title=f"Test Notification {index + 1}",
             message=f"This is stress test notification number {index + 1}",
             notification_type=notif_type,
@@ -725,9 +725,9 @@ class AlertDemoWidget(QWidget):
         action_text = self.msgbar_action_text.text(
         ) if self.msgbar_action_check.isChecked() else ""
 
-        msgbar = FluentMessageBar(
+        msgbar = EnhancedFluentNotification(
             message=message,
-            message_type=msgbar_type,
+            notification_type=msgbar_type,
             closable=closable,
             action_text=action_text
         )
@@ -735,7 +735,7 @@ class AlertDemoWidget(QWidget):
         # Connect events
         msgbar.closed.connect(lambda: self._remove_message_bar(msgbar))
         if action_text:
-            msgbar.action_clicked.connect(
+            msgbar.clicked.connect(
                 lambda: self._log_event("Message bar action clicked"))
 
         self.msgbar_display_area.addWidget(msgbar)
@@ -744,9 +744,9 @@ class AlertDemoWidget(QWidget):
 
     def _create_predefined_message_bar(self, msg_type, message):
         """Create a predefined message bar"""
-        msgbar = FluentMessageBar(
+        msgbar = EnhancedFluentNotification(
             message=message,
-            message_type=msg_type,
+            notification_type=msg_type,
             closable=True,
             action_text="Action" if msg_type in [
                 AlertType.ERROR, AlertType.WARNING] else ""
@@ -754,7 +754,7 @@ class AlertDemoWidget(QWidget):
 
         msgbar.closed.connect(lambda: self._remove_message_bar(msgbar))
         if msgbar._action_text:
-            msgbar.action_clicked.connect(
+            msgbar.clicked.connect(
                 lambda: self._log_event("Message bar action clicked"))
 
         self.msgbar_display_area.addWidget(msgbar)
@@ -779,7 +779,7 @@ class AlertDemoWidget(QWidget):
     def _demo_theme_changes(self):
         """Demonstrate theme changes"""
         # Create alerts in both themes
-        alert1 = FluentAlert(
+        alert1 = EnhancedFluentAlert(
             "Theme Test", "This alert will change with the theme", AlertType.INFO)
         self.alert_display_area.addWidget(alert1)
 
@@ -796,7 +796,7 @@ class AlertDemoWidget(QWidget):
         speed = self.animation_speed_slider.value()
 
         # Create alert with custom timing (this would need to be implemented in the alert class)
-        alert = FluentAlert(
+        alert = EnhancedFluentAlert(
             "Animation Test",
             f"This alert uses {speed}ms animation timing",
             AlertType.INFO,
@@ -807,7 +807,7 @@ class AlertDemoWidget(QWidget):
 
     def _create_event_alert(self):
         """Create alert with comprehensive event logging"""
-        alert = FluentAlert(
+        alert = EnhancedFluentAlert(
             "Event Test Alert",
             "This alert logs all events for demonstration",
             AlertType.INFO,
@@ -830,7 +830,7 @@ class AlertDemoWidget(QWidget):
 
         # Create multiple alerts quickly
         for i in range(5):
-            alert = FluentAlert(
+            alert = EnhancedFluentAlert(
                 f"Performance Test {i+1}", "Testing rendering performance", AlertType.INFO)
             self.alert_display_area.addWidget(alert)
 
@@ -849,7 +849,7 @@ class AlertDemoWidget(QWidget):
         self.demo_status_label.setText("Demo: App Update Scenario")
 
         # Show update notification
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             "Update Available",
             "A new version of the app is available",
             AlertType.INFO,
@@ -864,9 +864,9 @@ class AlertDemoWidget(QWidget):
     def _continue_update_demo(self):
         """Continue update demo"""
         # Show download progress
-        msgbar = FluentMessageBar(
+        msgbar = EnhancedFluentNotification(
             "Downloading update... 45%",
-            AlertType.INFO,
+            notification_type=AlertType.INFO,
             closable=False
         )
         self.msgbar_display_area.addWidget(msgbar)
@@ -899,7 +899,7 @@ class AlertDemoWidget(QWidget):
 
     def _show_validation_error(self, error):
         """Show validation error"""
-        alert = FluentAlert("Validation Error", error,
+        alert = EnhancedFluentAlert("Validation Error", error,
                             AlertType.ERROR, timeout=3000)
         self.alert_display_area.addWidget(alert)
 
@@ -920,7 +920,7 @@ class AlertDemoWidget(QWidget):
 
     def _show_file_operation(self, message, msg_type):
         """Show file operation notification"""
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             "File Operation",
             message,
             msg_type,
@@ -933,8 +933,11 @@ class AlertDemoWidget(QWidget):
         self.demo_status_label.setText("Demo: Network Status")
 
         # Simulate network issues
-        msgbar1 = FluentMessageBar(
-            "Connection lost", AlertType.ERROR, action_text="Retry")
+        msgbar1 = EnhancedFluentNotification(
+            title="Connection lost",
+            message="Network connection interrupted",
+            notification_type=AlertType.ERROR,
+            action_text="Retry")
         self.msgbar_display_area.addWidget(msgbar1)
 
         QTimer.singleShot(3000, lambda: self._restore_connection(msgbar1))
@@ -962,7 +965,7 @@ class AlertDemoWidget(QWidget):
 
     def _show_onboarding_step(self, step):
         """Show onboarding step"""
-        notification = FluentNotification(
+        notification = EnhancedFluentNotification(
             "Onboarding",
             step,
             AlertType.INFO,
@@ -975,7 +978,7 @@ class AlertDemoWidget(QWidget):
         self.demo_status_label.setText("Demo: Error Recovery")
 
         # Show error
-        error_alert = FluentAlert(
+        error_alert = EnhancedFluentAlert(
             "Operation Failed",
             "The operation could not be completed due to a network error.",
             AlertType.ERROR,
@@ -987,7 +990,11 @@ class AlertDemoWidget(QWidget):
     def _retry_operation(self):
         """Retry operation demo"""
         # Show retry in progress
-        msgbar = FluentMessageBar("Retrying operation...", AlertType.INFO)
+        msgbar = EnhancedFluentNotification(
+            title="Operation in progress",
+            message="Retrying operation...",
+            notification_type=AlertType.INFO
+        )
         self.msgbar_display_area.addWidget(msgbar)
 
         # Show success

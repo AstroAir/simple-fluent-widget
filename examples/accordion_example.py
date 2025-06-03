@@ -78,23 +78,23 @@ class AccordionExampleWindow(QMainWindow):
         
         # Create accordion
         self.settings_accordion = FluentAccordion()
-        self.settings_accordion.setAllowMultipleExpanded(True)
+        self.settings_accordion.setAllowMultiple(True)
         
         # General Settings
         general_widget = self._create_general_settings_widget()
-        self.settings_accordion.addItem("🔧 General Settings", general_widget)
+        self.settings_accordion.addItem("General Settings", general_widget)
         
         # Display Settings
         display_widget = self._create_display_settings_widget()
-        self.settings_accordion.addItem("🖥️ Display Settings", display_widget)
+        self.settings_accordion.addItem("Display Settings", display_widget)
         
         # Audio Settings
         audio_widget = self._create_audio_settings_widget()
-        self.settings_accordion.addItem("🔊 Audio Settings", audio_widget)
+        self.settings_accordion.addItem("Audio Settings", audio_widget)
         
         # Privacy Settings
         privacy_widget = self._create_privacy_settings_widget()
-        self.settings_accordion.addItem("🔒 Privacy & Security", privacy_widget)
+        self.settings_accordion.addItem("Privacy & Security", privacy_widget)
         
         layout.addWidget(self.settings_accordion)
         parent_layout.addWidget(group)
@@ -106,7 +106,7 @@ class AccordionExampleWindow(QMainWindow):
         
         # Language selection
         language_combo = QComboBox()
-        language_combo.addItems(["English", "中文", "Français", "Deutsch", "日本語"])
+        language_combo.addItems(["English", "Chinese", "French", "German", "Japanese"])
         layout.addRow("Language:", language_combo)
         
         # Auto-save
@@ -265,23 +265,23 @@ class AccordionExampleWindow(QMainWindow):
         
         # Create accordion - only one item can be expanded
         self.content_accordion = FluentAccordion()
-        self.content_accordion.setAllowMultipleExpanded(False)
+        self.content_accordion.setAllowMultiple(False)
         
         # Documentation section
         doc_widget = self._create_documentation_widget()
-        self.content_accordion.addItem("📚 Documentation", doc_widget)
+        self.content_accordion.addItem("Documentation", doc_widget)
         
         # Tutorials section
         tutorial_widget = self._create_tutorials_widget()
-        self.content_accordion.addItem("🎓 Tutorials", tutorial_widget)
+        self.content_accordion.addItem("Tutorials", tutorial_widget)
         
         # Examples section
         examples_widget = self._create_examples_widget()
-        self.content_accordion.addItem("💡 Code Examples", examples_widget)
+        self.content_accordion.addItem("Code Examples", examples_widget)
         
         # FAQ section
         faq_widget = self._create_faq_widget()
-        self.content_accordion.addItem("❓ Frequently Asked Questions", faq_widget)
+        self.content_accordion.addItem("Frequently Asked Questions", faq_widget)
         
         layout.addWidget(self.content_accordion)
         parent_layout.addWidget(group)
@@ -339,7 +339,7 @@ class AccordionExampleWindow(QMainWindow):
         ]
         
         for tutorial in tutorials:
-            tutorial_list.addItem(f"▶️ {tutorial}")
+            tutorial_list.addItem(tutorial)
         
         layout.addWidget(QLabel("Available Tutorials:"))
         layout.addWidget(tutorial_list)
@@ -374,7 +374,7 @@ accordion.addItem("Settings", settings_widget)
 accordion.addItem("About", about_widget)
 
 # Configure behavior
-accordion.setAllowMultipleExpanded(True)
+accordion.setAllowMultiple(True)
 accordion.setAnimateTransitions(True)
         """)
         basic_code.setReadOnly(True)
@@ -437,19 +437,19 @@ accordion.item_clicked.connect(on_item_clicked)
         
         # Create accordion for form sections
         self.form_accordion = FluentAccordion()
-        self.form_accordion.setAllowMultipleExpanded(True)
+        self.form_accordion.setAllowMultiple(True)
         
         # Personal Information
         personal_widget = self._create_personal_info_widget()
-        self.form_accordion.addItem("👤 Personal Information", personal_widget)
+        self.form_accordion.addItem("Personal Information", personal_widget)
         
         # Contact Details
         contact_widget = self._create_contact_widget()
-        self.form_accordion.addItem("📞 Contact Details", contact_widget)
+        self.form_accordion.addItem("Contact Details", contact_widget)
         
         # Preferences
         preferences_widget = self._create_preferences_widget()
-        self.form_accordion.addItem("⚙️ Preferences", preferences_widget)
+        self.form_accordion.addItem("Preferences", preferences_widget)
         
         layout.addWidget(self.form_accordion)
         
@@ -502,21 +502,16 @@ accordion.item_clicked.connect(on_item_clicked)
         layout = QFormLayout(widget)
         
         email = QLineEdit()
-        email.setPlaceholderText("example@email.com")
+        email.setPlaceholderText("user@example.com")
         layout.addRow("Email:", email)
         
         phone = QLineEdit()
-        phone.setPlaceholderText("+1 (555) 123-4567")
+        phone.setPlaceholderText("+1 (123) 456-7890")
         layout.addRow("Phone:", phone)
         
-        address = QTextEdit()
-        address.setMaximumHeight(80)
-        address.setPlaceholderText("Enter your address")
+        address = QLineEdit()
+        address.setPlaceholderText("123 Main St, City, Country")
         layout.addRow("Address:", address)
-        
-        country_combo = QComboBox()
-        country_combo.addItems(["United States", "Canada", "United Kingdom", "Germany", "France", "Japan", "Other"])
-        layout.addRow("Country:", country_combo)
         
         return widget
 
@@ -526,33 +521,29 @@ accordion.item_clicked.connect(on_item_clicked)
         layout = QVBoxLayout(widget)
         
         # Notification preferences
-        notifications_group = QGroupBox("Notifications")
-        notifications_layout = QVBoxLayout(notifications_group)
+        notif_group = QGroupBox("Notification Preferences")
+        notif_layout = QVBoxLayout(notif_group)
         
-        email_notifications = QCheckBox("Email notifications")
-        email_notifications.setChecked(True)
-        push_notifications = QCheckBox("Push notifications")
-        marketing_emails = QCheckBox("Marketing emails")
+        email_notif = QCheckBox("Email notifications")
+        email_notif.setChecked(True)
+        push_notif = QCheckBox("Push notifications")
+        sms_notif = QCheckBox("SMS alerts")
         
-        notifications_layout.addWidget(email_notifications)
-        notifications_layout.addWidget(push_notifications)
-        notifications_layout.addWidget(marketing_emails)
+        notif_layout.addWidget(email_notif)
+        notif_layout.addWidget(push_notif)
+        notif_layout.addWidget(sms_notif)
         
-        layout.addWidget(notifications_group)
+        layout.addWidget(notif_group)
         
-        # Communication preferences
-        communication_group = QGroupBox("Communication")
-        communication_layout = QFormLayout(communication_group)
-        
-        preferred_contact = QComboBox()
-        preferred_contact.addItems(["Email", "Phone", "SMS", "Mail"])
-        communication_layout.addRow("Preferred Contact:", preferred_contact)
-        
-        frequency_combo = QComboBox()
-        frequency_combo.addItems(["Daily", "Weekly", "Monthly", "Never"])
-        communication_layout.addRow("Contact Frequency:", frequency_combo)
-        
-        layout.addWidget(communication_group)
+        # Communication frequency
+        freq_layout = QHBoxLayout()
+        freq_label = QLabel("Communication frequency:")
+        freq_combo = QComboBox()
+        freq_combo.addItems(["Daily", "Weekly", "Monthly", "As needed"])
+        freq_layout.addWidget(freq_label)
+        freq_layout.addWidget(freq_combo)
+        freq_layout.addStretch()
+        layout.addLayout(freq_layout)
         
         return widget
 
@@ -572,120 +563,114 @@ accordion.item_clicked.connect(on_item_clicked)
         # Dynamic accordion
         self._create_dynamic_accordion(right_layout)
         
-        # Nested accordion example
+        # Nested accordion
         self._create_nested_accordion(right_layout)
         
         parent_layout.addWidget(right_panel)
 
     def _create_control_panel(self, parent_layout):
-        """Create accordion control panel"""
+        """Create control panel for accordion features"""
         group = QGroupBox("Accordion Controls")
         layout = QVBoxLayout(group)
         
-        # Global controls
-        global_controls = QHBoxLayout()
+        # Expand/Collapse all buttons
+        expand_btn = QPushButton("Expand All")
+        expand_btn.clicked.connect(self._expand_all_accordions)
         
-        expand_all_btn = QPushButton("Expand All")
-        expand_all_btn.clicked.connect(lambda: self._expand_all_accordions())
+        collapse_btn = QPushButton("Collapse All")
+        collapse_btn.clicked.connect(self._collapse_all_accordions)
         
-        collapse_all_btn = QPushButton("Collapse All")
-        collapse_all_btn.clicked.connect(lambda: self._collapse_all_accordions())
+        # Toggle animations
+        self.animation_toggle_btn = QPushButton("Disable Animations")
+        self.animation_toggle_btn.clicked.connect(self._toggle_animations)
         
-        toggle_animations_btn = QPushButton("Toggle Animations")
-        toggle_animations_btn.clicked.connect(self._toggle_animations)
+        # Toggle multiple expand
+        multiple_toggle = QCheckBox("Allow Multiple Expanded Items")
+        multiple_toggle.setChecked(True)
+        multiple_toggle.toggled.connect(self._toggle_multiple_expand)
         
-        global_controls.addWidget(expand_all_btn)
-        global_controls.addWidget(collapse_all_btn)
-        global_controls.addWidget(toggle_animations_btn)
-        
-        layout.addLayout(global_controls)
-        
-        # Settings controls
-        settings_controls = QGridLayout()
-        
-        # Multiple expand setting
-        multiple_expand_check = QCheckBox("Allow Multiple Expanded")
-        multiple_expand_check.setChecked(True)
-        multiple_expand_check.toggled.connect(self._toggle_multiple_expand)
-        settings_controls.addWidget(multiple_expand_check, 0, 0)
-        
-        # Animation speed
+        # Animation speed control
+        speed_layout = QHBoxLayout()
         speed_label = QLabel("Animation Speed:")
         speed_slider = QSlider(Qt.Orientation.Horizontal)
-        speed_slider.setRange(100, 1000)
-        speed_slider.setValue(300)
+        speed_slider.setRange(50, 500)
+        speed_slider.setValue(100)
         speed_slider.valueChanged.connect(self._change_animation_speed)
-        settings_controls.addWidget(speed_label, 1, 0)
-        settings_controls.addWidget(speed_slider, 1, 1)
+        speed_layout.addWidget(speed_label)
+        speed_layout.addWidget(speed_slider)
         
-        # Stagger delay
+        # Stagger delay control
+        stagger_layout = QHBoxLayout()
         stagger_label = QLabel("Stagger Delay:")
-        stagger_spin = QSpinBox()
-        stagger_spin.setRange(0, 200)
-        stagger_spin.setValue(50)
-        stagger_spin.valueChanged.connect(self._change_stagger_delay)
-        settings_controls.addWidget(stagger_label, 2, 0)
-        settings_controls.addWidget(stagger_spin, 2, 1)
+        stagger_slider = QSlider(Qt.Orientation.Horizontal)
+        stagger_slider.setRange(0, 200)
+        stagger_slider.setValue(50)
+        stagger_slider.valueChanged.connect(self._change_stagger_delay)
+        stagger_layout.addWidget(stagger_label)
+        stagger_layout.addWidget(stagger_slider)
         
-        layout.addLayout(settings_controls)
-        
-        # Status display
+        # Status label
         self.status_label = QLabel("Status: Ready")
-        self.status_label.setStyleSheet("color: #0078d4; font-weight: bold;")
+        
+        layout.addWidget(expand_btn)
+        layout.addWidget(collapse_btn)
+        layout.addWidget(self.animation_toggle_btn)
+        layout.addWidget(multiple_toggle)
+        layout.addLayout(speed_layout)
+        layout.addLayout(stagger_layout)
         layout.addWidget(self.status_label)
         
         parent_layout.addWidget(group)
 
     def _create_dynamic_accordion(self, parent_layout):
-        """Create dynamic accordion for testing"""
-        group = QGroupBox("Dynamic Accordion Test")
+        """Create dynamic accordion example"""
+        group = QGroupBox("Dynamic Accordion")
         layout = QVBoxLayout(group)
         
-        # Create accordion
         self.dynamic_accordion = FluentAccordion()
         
-        # Initial items
-        for i in range(3):
-            content = QLabel(f"Dynamic content {i+1}\nThis content was added dynamically.")
-            content.setMinimumHeight(60)
-            content.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            content.setStyleSheet("background-color: rgba(0, 120, 212, 0.1); border-radius: 4px; padding: 10px;")
-            self.dynamic_accordion.addItem(f"Dynamic Item {i+1}", content)
+        # Add initial item
+        self.dynamic_accordion.addItem("Dynamic Section 1", self._create_dynamic_content(1))
+        
+        # Controls
+        controls_layout = QHBoxLayout()
+        
+        add_btn = QPushButton("Add Item")
+        add_btn.clicked.connect(self._add_dynamic_item)
+        
+        remove_btn = QPushButton("Remove Last Item")
+        remove_btn.clicked.connect(self._remove_dynamic_item)
+        
+        insert_btn = QPushButton("Insert Item at Position 1")
+        insert_btn.clicked.connect(self._insert_dynamic_item)
+        
+        controls_layout.addWidget(add_btn)
+        controls_layout.addWidget(remove_btn)
+        controls_layout.addWidget(insert_btn)
         
         layout.addWidget(self.dynamic_accordion)
-        
-        # Dynamic controls
-        dynamic_controls = QHBoxLayout()
-        
-        add_item_btn = QPushButton("Add Item")
-        add_item_btn.clicked.connect(self._add_dynamic_item)
-        
-        remove_item_btn = QPushButton("Remove Last")
-        remove_item_btn.clicked.connect(self._remove_dynamic_item)
-        
-        insert_item_btn = QPushButton("Insert at Start")
-        insert_item_btn.clicked.connect(self._insert_dynamic_item)
-        
-        dynamic_controls.addWidget(add_item_btn)
-        dynamic_controls.addWidget(remove_item_btn)
-        dynamic_controls.addWidget(insert_item_btn)
-        
-        layout.addLayout(dynamic_controls)
+        layout.addLayout(controls_layout)
         parent_layout.addWidget(group)
+
+    def _create_dynamic_content(self, index):
+        """Create content for dynamic accordion item"""
+        content = QLabel(f"Dynamic content {index}\nAdded at runtime with smooth animation.")
+        content.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        return content
 
     def _create_nested_accordion(self, parent_layout):
         """Create nested accordion example"""
-        group = QGroupBox("Nested Accordion Example")
+        group = QGroupBox("Nested Accordion")
         layout = QVBoxLayout(group)
         
-        # Main accordion
         self.nested_accordion = FluentAccordion()
-        self.nested_accordion.setAllowMultipleExpanded(True)
+        self.nested_accordion.setAllowMultiple(True)
         
-        # Create nested content
-        for category in ["UI Components", "Data Structures", "Algorithms"]:
-            nested_content = self._create_nested_content(category)
-            self.nested_accordion.addItem(f"📁 {category}", nested_content)
+        # Categories
+        categories = ["Development", "Design", "Documentation"]
+        for category in categories:
+            nested_widget = self._create_nested_content(category)
+            self.nested_accordion.addItem(category, nested_widget)
         
         layout.addWidget(self.nested_accordion)
         parent_layout.addWidget(group)
@@ -695,165 +680,126 @@ accordion.item_clicked.connect(on_item_clicked)
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # Description
-        description = QLabel(f"This section contains items related to {category.lower()}.")
-        description.setWordWrap(True)
-        layout.addWidget(description)
-        
-        # Nested accordion
         nested_accordion = FluentAccordion()
-        nested_accordion.setAllowMultipleExpanded(False)
+        nested_accordion.setAllowMultiple(False)
         
-        if category == "UI Components":
-            items = ["Buttons", "Text Fields", "Sliders", "Progress Bars"]
-        elif category == "Data Structures":
-            items = ["Arrays", "Lists", "Trees", "Graphs"]
-        else:  # Algorithms
-            items = ["Sorting", "Searching", "Graph Traversal", "Dynamic Programming"]
-        
-        for item in items:
-            content = QLabel(f"Information about {item.lower()}\n\nThis is a nested accordion item that demonstrates the flexibility of the FluentAccordion component.")
-            content.setWordWrap(True)
-            content.setMinimumHeight(80)
-            content.setStyleSheet("padding: 10px; background-color: rgba(255, 255, 255, 0.05); border-radius: 4px;")
-            nested_accordion.addItem(item, content)
+        # Add nested items
+        for i in range(1, 4):
+            content = QLabel(f"{category} topic {i} content\nNested accordion item")
+            nested_accordion.addItem(f"Topic {i}", content)
         
         layout.addWidget(nested_accordion)
         return widget
 
-    # Event handlers and utility methods
-    
     def _expand_all_accordions(self):
         """Expand all accordion items"""
-        accordions = [self.settings_accordion, self.content_accordion, 
-                     self.form_accordion, self.dynamic_accordion, self.nested_accordion]
-        
+        accordions = [
+            self.settings_accordion,
+            self.content_accordion,
+            self.form_accordion,
+            self.nested_accordion,
+            self.dynamic_accordion
+        ]
         for accordion in accordions:
             accordion.expandAll()
-        
-        self.status_label.setText("Status: All items expanded")
-        QTimer.singleShot(3000, lambda: self.status_label.setText("Status: Ready"))
 
     def _collapse_all_accordions(self):
         """Collapse all accordion items"""
-        accordions = [self.settings_accordion, self.content_accordion, 
-                     self.form_accordion, self.dynamic_accordion, self.nested_accordion]
-        
+        accordions = [
+            self.settings_accordion,
+            self.content_accordion,
+            self.form_accordion,
+            self.nested_accordion,
+            self.dynamic_accordion
+        ]
         for accordion in accordions:
             accordion.collapseAll()
-        
-        self.status_label.setText("Status: All items collapsed")
-        QTimer.singleShot(3000, lambda: self.status_label.setText("Status: Ready"))
 
     def _toggle_animations(self):
-        """Toggle animations for all accordions"""
-        accordions = [self.settings_accordion, self.content_accordion, 
-                     self.form_accordion, self.dynamic_accordion, self.nested_accordion]
-        
-        current_state = accordions[0].animateTransitions()
+        """Toggle animations on/off"""
+        accordions = [
+            self.settings_accordion,
+            self.content_accordion,
+            self.form_accordion,
+            self.nested_accordion,
+            self.dynamic_accordion
+        ]
+        current_state = accordions[0].getAnimateTransitions()
         new_state = not current_state
-        
         for accordion in accordions:
             accordion.setAnimateTransitions(new_state)
-        
-        status = "enabled" if new_state else "disabled"
-        self.status_label.setText(f"Status: Animations {status}")
-        QTimer.singleShot(3000, lambda: self.status_label.setText("Status: Ready"))
+        self.animation_toggle_btn.setText("Disable Animations" if new_state else "Enable Animations")
 
     def _toggle_multiple_expand(self, checked):
-        """Toggle multiple expand for settings accordion"""
-        self.settings_accordion.setAllowMultipleExpanded(checked)
-        status = "allowed" if checked else "restricted"
-        self.status_label.setText(f"Status: Multiple expand {status}")
-        QTimer.singleShot(3000, lambda: self.status_label.setText("Status: Ready"))
+        """Toggle multiple expand mode"""
+        self.settings_accordion.setAllowMultiple(checked)
+        self.content_accordion.setAllowMultiple(checked)
+        self.form_accordion.setAllowMultiple(checked)
+        self.nested_accordion.setAllowMultiple(checked)
 
     def _change_animation_speed(self, value):
-        """Change animation speed (placeholder - would need accordion method)"""
-        self.status_label.setText(f"Status: Animation speed set to {value}ms")
-        QTimer.singleShot(2000, lambda: self.status_label.setText("Status: Ready"))
+        """Change animation speed (not implemented)"""
+        # This would require adding setAnimationDuration method
+        self.status_label.setText(f"Status: Animation speed not implemented")
 
     def _change_stagger_delay(self, value):
-        """Change stagger delay"""
-        accordions = [self.settings_accordion, self.content_accordion, 
-                     self.form_accordion, self.dynamic_accordion, self.nested_accordion]
-        
+        """Change stagger delay for expand/collapse all"""
+        accordions = [
+            self.settings_accordion,
+            self.content_accordion,
+            self.form_accordion,
+            self.nested_accordion,
+            self.dynamic_accordion
+        ]
         for accordion in accordions:
-            accordion.setStaggerDelay(value)
-        
-        self.status_label.setText(f"Status: Stagger delay set to {value}ms")
-        QTimer.singleShot(2000, lambda: self.status_label.setText("Status: Ready"))
+            # Stagger delay method not available in current implementation
+            # accordion.setStaggerDelay(value)
+            pass
+        self.status_label.setText(f"Status: Stagger delay not implemented")
 
     def _add_dynamic_item(self):
-        """Add item to dynamic accordion"""
-        count = self.dynamic_accordion.itemCount()
-        content = QLabel(f"Dynamic content {count+1}\nAdded at runtime with smooth animation.")
-        content.setMinimumHeight(60)
-        content.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        content.setStyleSheet("background-color: rgba(0, 120, 212, 0.1); border-radius: 4px; padding: 10px;")
-        
-        self.dynamic_accordion.addItem(f"Dynamic Item {count+1}", content)
-        self.status_label.setText(f"Status: Added item {count+1}")
-        QTimer.singleShot(2000, lambda: self.status_label.setText("Status: Ready"))
+        """Add a new item to the dynamic accordion"""
+        count = self.dynamic_accordion.getItemCount()
+        self.dynamic_accordion.addItem(f"Dynamic Section {count+1}", self._create_dynamic_content(count+1))
 
     def _remove_dynamic_item(self):
         """Remove last item from dynamic accordion"""
-        count = self.dynamic_accordion.itemCount()
+        count = self.dynamic_accordion.getItemCount()
         if count > 0:
-            self.dynamic_accordion.removeItem(count - 1)
-            self.status_label.setText(f"Status: Removed item {count}")
-            QTimer.singleShot(2000, lambda: self.status_label.setText("Status: Ready"))
+            self.dynamic_accordion.removeItem(count-1)
 
     def _insert_dynamic_item(self):
-        """Insert item at start of dynamic accordion"""
-        content = QLabel("Inserted content\nThis item was inserted at the beginning.")
-        content.setMinimumHeight(60)
-        content.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        content.setStyleSheet("background-color: rgba(255, 165, 0, 0.1); border-radius: 4px; padding: 10px;")
-        
-        self.dynamic_accordion.insertItem(0, "Inserted Item", content)
-        self.status_label.setText("Status: Inserted item at start")
-        QTimer.singleShot(2000, lambda: self.status_label.setText("Status: Ready"))
+        """Insert item at position 1 in dynamic accordion"""
+        count = self.dynamic_accordion.getItemCount()
+        if count > 0:
+            self.dynamic_accordion.insertItem(1, "Inserted Section", self._create_dynamic_content(count+1))
 
     def _add_dynamic_section(self):
-        """Add dynamic section to form accordion"""
-        count = self.form_accordion.itemCount()
-        
-        # Create dynamic form section
+        """Add a new section to the form accordion"""
+        count = self.form_accordion.getItemCount()
+        self.form_accordion.insertItem(1, f"Extra Section {count}", self._create_dynamic_form_section())
+
+    def _create_dynamic_form_section(self):
+        """Create content for dynamic form section"""
         widget = QWidget()
         layout = QFormLayout(widget)
         
-        field1 = QLineEdit()
-        field1.setPlaceholderText(f"Dynamic field {count+1}")
-        layout.addRow(f"Field {count+1}:", field1)
+        field = QLineEdit()
+        field.setPlaceholderText("Enter information")
+        layout.addRow("Dynamic Field:", field)
         
-        field2 = QComboBox()
-        field2.addItems(["Option 1", "Option 2", "Option 3"])
-        layout.addRow(f"Selection {count+1}:", field2)
-        
-        self.form_accordion.addItem(f"🆕 Dynamic Section {count-2}", widget)
-        self.status_label.setText(f"Status: Added form section")
-        QTimer.singleShot(2000, lambda: self.status_label.setText("Status: Ready"))
+        return widget
 
     def _validate_form(self):
-        """Validate form (placeholder)"""
-        self.status_label.setText("Status: Form validation passed ✓")
-        QTimer.singleShot(3000, lambda: self.status_label.setText("Status: Ready"))
+        """Validate form data (placeholder)"""
+        self.status_label.setText("Status: Form validation not implemented")
 
 
 def main():
-    """Run the accordion example"""
+    """Main function to run the example"""
     app = QApplication(sys.argv)
-    
-    # Set application properties
-    app.setApplicationName("FluentAccordion Example")
-    app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("Fluent Widget Examples")
-    
-    # Create and show window
     window = AccordionExampleWindow()
     window.show()
-    
-    # Run application
     sys.exit(app.exec())
 
 
