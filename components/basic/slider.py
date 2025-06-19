@@ -1,21 +1,21 @@
 """
 Fluent Design Style Slider Components
 Enhanced with smooth animations, theme consistency, and responsive interactions
+Optimized for performance
 """
 
-from PySide6.QtWidgets import QSlider, QWidget, QLabel, QHBoxLayout  # Removed QVBoxLayout
-# Removed QPropertyAnimation, QEasingCurve, QTimer
+from PySide6.QtWidgets import QSlider, QWidget, QLabel, QHBoxLayout
 from PySide6.QtCore import Qt, Signal, QRect
-# Removed QColor, QFont, QFontMetrics
 from PySide6.QtGui import QPainter, QPen, QBrush
 from core.theme import theme_manager
 from core.enhanced_animations import (FluentMicroInteraction, FluentTransition,
                                       FluentStateTransition, FluentRevealEffect)
 from typing import Optional
+from functools import lru_cache
 
 
 class FluentSlider(QSlider):
-    """Fluent Design Style Slider with enhanced animations"""
+    """Fluent Design Style Slider with enhanced animations and optimized performance"""
 
     class SliderStyle:
         STANDARD = "standard"
@@ -50,6 +50,10 @@ class FluentSlider(QSlider):
         self._is_hovered = False
         self._is_pressed = False
 
+        # Cache for style calculations
+        self._cached_style = None
+        self._cached_theme = None
+
         self._setup_animations()
         self._apply_style()
         self._setup_connections()
@@ -60,9 +64,28 @@ class FluentSlider(QSlider):
         # Add reveal animation when created
         FluentRevealEffect.fade_in(self, 300)
 
+    @lru_cache(maxsize=8)
+    def _get_track_height(self) -> int:
+        """Get track height based on size with caching"""
+        if self._size == self.Size.SMALL:
+            return 20
+        elif self._size == self.Size.LARGE:
+            return 32
+        else:  # MEDIUM
+            return 26
+
+    @lru_cache(maxsize=8)
+    def _get_handle_size(self) -> int:
+        """Get handle size based on size with caching"""
+        if self._size == self.Size.SMALL:
+            return 16
+        elif self._size == self.Size.LARGE:
+            return 24
+        else:  # MEDIUM
+            return 20
+
     def _setup_animations(self):
-        """Setup enhanced animation effects"""
-        # Setup state transitions for different slider states
+        """Setup optimized animation effects"""
         track_height = self._get_track_height()
 
         self._state_transition.addState("normal", {
@@ -77,34 +100,24 @@ class FluentSlider(QSlider):
             "minimumHeight": track_height + 4,
         }, duration=100, easing=FluentTransition.EASE_SPRING)
 
-    def _get_track_height(self) -> int:
-        """Get track height based on size"""
-        if self._size == self.Size.SMALL:
-            return 20
-        elif self._size == self.Size.LARGE:
-            return 32
-        else:  # MEDIUM
-            return 26
-
-    def _get_handle_size(self) -> int:
-        """Get handle size based on size"""
-        if self._size == self.Size.SMALL:
-            return 16
-        elif self._size == self.Size.LARGE:
-            return 24
-        else:  # MEDIUM
-            return 20
-
     def _setup_connections(self):
-        """Setup signal connections"""
+        """Setup optimized signal connections"""
         self.valueChanged.connect(self._on_value_changed)
         self.sliderPressed.connect(self._on_slider_pressed)
         self.sliderReleased.connect(self._on_slider_released)
         self.sliderMoved.connect(self._on_slider_moved)
 
     def _apply_style(self):
-        """Apply style with enhanced visual effects"""
+        """Apply style with optimized calculations"""
         current_theme = theme_manager
+
+        # Only recalculate if theme or style has changed
+        if self._cached_theme == current_theme and self._cached_style == self._slider_style:
+            return
+
+        self._cached_theme = current_theme
+        self._cached_style = self._slider_style
+
         track_height = self._get_track_height()
         handle_size = self._get_handle_size()
 
@@ -119,6 +132,18 @@ class FluentSlider(QSlider):
             primary_color = current_theme.get_color('primary')
             hover_color = current_theme.get_color('primary').lighter(120)
 
+        # Pre-calculate color names for efficiency
+        primary_name = primary_color.name()
+        hover_name = hover_color.name()
+        primary_darker = primary_color.darker(110).name()
+        surface = current_theme.get_color('surface').name()
+        surface_light = current_theme.get_color('surface_light').name()
+        border = current_theme.get_color('border').name()
+        surface_lighter = current_theme.get_color(
+            'surface').lighter(110).name()
+        surface_darker = current_theme.get_color('surface').darker(105).name()
+        surface_disabled = current_theme.get_color('surface_disabled').name()
+
         style_sheet = f"""
             FluentSlider {{
                 background: transparent;
@@ -126,34 +151,34 @@ class FluentSlider(QSlider):
             }}
             
             FluentSlider::groove:horizontal {{
-                background: {current_theme.get_color('surface_light').name()};
+                background: {surface_light};
                 height: 4px;
                 border-radius: 2px;
-                border: 1px solid {current_theme.get_color('border').name()};
+                border: 1px solid {border};
             }}
             
             FluentSlider::groove:vertical {{
-                background: {current_theme.get_color('surface_light').name()};
+                background: {surface_light};
                 width: 4px;
                 border-radius: 2px;
-                border: 1px solid {current_theme.get_color('border').name()};
+                border: 1px solid {border};
             }}
             
             FluentSlider::sub-page:horizontal {{
-                background: {primary_color.name()};
+                background: {primary_name};
                 height: 4px;
                 border-radius: 2px;
             }}
             
             FluentSlider::sub-page:vertical {{
-                background: {primary_color.name()};
+                background: {primary_name};
                 width: 4px;
                 border-radius: 2px;
             }}
             
             FluentSlider::handle:horizontal {{
-                background: {current_theme.get_color('surface').name()};
-                border: 2px solid {primary_color.name()};
+                background: {surface};
+                border: 2px solid {primary_name};
                 width: {handle_size}px;
                 height: {handle_size}px;
                 border-radius: {handle_size // 2}px;
@@ -161,8 +186,8 @@ class FluentSlider(QSlider):
             }}
             
             FluentSlider::handle:vertical {{
-                background: {current_theme.get_color('surface').name()};
-                border: 2px solid {primary_color.name()};
+                background: {surface};
+                border: 2px solid {primary_name};
                 width: {handle_size}px;
                 height: {handle_size}px;
                 border-radius: {handle_size // 2}px;
@@ -170,49 +195,46 @@ class FluentSlider(QSlider):
             }}
             
             FluentSlider::handle:hover {{
-                border-color: {hover_color.name()};
-                background: {current_theme.get_color('surface').lighter(110).name()};
+                border-color: {hover_name};
+                background: {surface_lighter};
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             }}
             
             FluentSlider::handle:pressed {{
-                border-color: {primary_color.darker(110).name()};
-                background: {current_theme.get_color('surface').darker(105).name()};
+                border-color: {primary_darker};
+                background: {surface_darker};
                 box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
             }}
             
             FluentSlider::handle:disabled {{
-                background: {current_theme.get_color('surface_disabled').name()};
-                border-color: {current_theme.get_color('border').name()};
+                background: {surface_disabled};
+                border-color: {border};
             }}
         """
 
         self.setStyleSheet(style_sheet)
 
     def _on_theme_changed(self, _theme_name: str):
-        """Handle theme change"""
+        """Handle theme change efficiently"""
+        self._cached_theme = None
         self._apply_style()
 
     def _on_value_changed(self, value: int):
-        """Handle value change with micro-interaction"""
+        """Handle value change with optimized micro-interaction"""
         if self._is_dragging:
             self.value_changing.emit(value)
-            # Subtle pulse animation while dragging
             FluentMicroInteraction.pulse_animation(self, 1.01)
 
     def _on_slider_pressed(self):
-        """Handle slider press with animations"""
+        """Handle slider press with optimized animations"""
         self._is_pressed = True
         self._is_dragging = True
 
-        # Apply press glow effect
         FluentMicroInteraction.hover_glow(self, 0.3)
-
-        # Transition to pressed state
         self._state_transition.transitionTo("pressed")
 
     def _on_slider_released(self):
-        """Handle slider release"""
+        """Handle slider release with optimized transitions"""
         self._is_pressed = False
         self._is_dragging = False
 
@@ -226,15 +248,14 @@ class FluentSlider(QSlider):
             self._state_transition.transitionTo("normal")
 
     def _on_slider_moved(self, _value: int):
-        """Handle slider movement with micro-interaction"""
-        # Apply subtle vibration effect during movement
+        """Handle slider movement with optimized micro-interaction"""
+        # Use lighter animation for better performance
         FluentMicroInteraction.scale_animation(self, 1.01)
 
     def enterEvent(self, event):
-        """Hover enter event with enhanced animations"""
+        """Hover enter event with optimized animations"""
         self._is_hovered = True
 
-        # Apply hover glow effect if not pressed
         if not self._is_pressed:
             FluentMicroInteraction.hover_glow(self, 0.15)
             self._state_transition.transitionTo("hovered")
@@ -242,31 +263,38 @@ class FluentSlider(QSlider):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Hover leave event"""
+        """Hover leave event with optimized transitions"""
         self._is_hovered = False
 
-        # Transition back to normal state if not pressed
         if not self._is_pressed:
             self._state_transition.transitionTo("normal")
 
         super().leaveEvent(event)
 
     def set_style(self, style: str):
-        """Set slider style"""
+        """Set slider style efficiently"""
         if style in [self.SliderStyle.STANDARD, self.SliderStyle.ACCENT, self.SliderStyle.SUBTLE]:
-            self._slider_style = style
-            self._apply_style()
+            if self._slider_style != style:
+                self._slider_style = style
+                self._cached_style = None  # Reset style cache
+                self._apply_style()
 
     def set_size(self, size: str):
-        """Set slider size"""
+        """Set slider size efficiently"""
         if size in [self.Size.SMALL, self.Size.MEDIUM, self.Size.LARGE]:
-            self._size = size
-            self._setup_animations()
-            self._apply_style()
+            if self._size != size:
+                self._size = size
+
+                # Clear cached calculations
+                self._get_track_height.cache_clear()
+                self._get_handle_size.cache_clear()
+
+                self._setup_animations()
+                self._apply_style()
 
 
 class FluentRangeSlider(QWidget):
-    """Fluent Design Style Range Slider with dual handles"""
+    """Optimized Fluent Design Style Range Slider with dual handles"""
 
     range_changed = Signal(int, int)  # Emitted when range changes
     range_changing = Signal(int, int)  # Emitted while dragging
@@ -287,6 +315,13 @@ class FluentRangeSlider(QWidget):
         self._is_hovered = False
         self._state_transition = FluentStateTransition(self)
 
+        # Cache for layout calculations
+        self._track_rect = None
+        self._low_handle_pos = None
+        self._high_handle_pos = None
+        self._value_range = None
+        self._cached_theme = None
+
         self.setMinimumHeight(40)
         self.setMinimumWidth(150)
 
@@ -300,7 +335,7 @@ class FluentRangeSlider(QWidget):
         FluentRevealEffect.slide_in(self, 300, "bottom")
 
     def _setup_animations(self):
-        """Setup enhanced animation effects"""
+        """Setup optimized animation effects"""
         self._state_transition.addState("normal", {
             "minimumHeight": 40,
         })
@@ -310,93 +345,120 @@ class FluentRangeSlider(QWidget):
         }, duration=150, easing=FluentTransition.EASE_SMOOTH)
 
     def _apply_style(self):
-        """Apply range slider styling"""
-        # current_theme = theme_manager # Not used in this specific style sheet
+        """Apply range slider styling efficiently"""
+        current_theme = theme_manager
 
-        style_sheet = f"""
-            FluentRangeSlider {{
-                background: transparent;
-                border: none;
-            }}
-        """
+        # Only update if theme changed
+        if self._cached_theme == current_theme:
+            return
 
-        self.setStyleSheet(style_sheet)
+        self._cached_theme = current_theme
+        self.setStyleSheet(
+            "FluentRangeSlider { background: transparent; border: none; }")
 
     def _on_theme_changed(self, _theme_name: str):
-        """Handle theme change"""
+        """Handle theme change efficiently"""
+        self._cached_theme = None
         self._apply_style()
         self.update()
 
-    def paintEvent(self, _event):
-        """Custom paint event for range slider"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        current_theme = theme_manager
+    def _calculate_layout(self):
+        """Pre-calculate layout values to optimize paint event"""
         rect = self.rect()
 
-        # Calculate positions
-        track_rect = QRect(
+        # Calculate track rectangle
+        self._track_rect = QRect(
             self._handle_size // 2,
             rect.height() // 2 - self._track_height // 2,
             rect.width() - self._handle_size,
             self._track_height
         )
 
-        value_range = self._maximum - self._minimum
-        if value_range == 0:  # Avoid division by zero
-            low_pos = 0
-            high_pos = 0
+        # Calculate value range once
+        self._value_range = self._maximum - self._minimum
+
+        # Calculate handle positions
+        if self._value_range == 0:  # Avoid division by zero
+            self._low_handle_pos = 0
+            self._high_handle_pos = 0
         else:
-            low_pos = int((self._low_value - self._minimum) /
-                          value_range * track_rect.width())
-            high_pos = int((self._high_value - self._minimum) /
-                           value_range * track_rect.width())
+            self._low_handle_pos = int((self._low_value - self._minimum) /
+                                       self._value_range * self._track_rect.width())
+            self._high_handle_pos = int((self._high_value - self._minimum) /
+                                        self._value_range * self._track_rect.width())
+
+        # Cache the center y-coordinate for handle drawing
+        self._center_y = rect.height() // 2
+
+    def paintEvent(self, _event):
+        """Optimized paint event for range slider"""
+        # Pre-calculate all layout values
+        self._calculate_layout()
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        current_theme = theme_manager
+
+        # Get colors once and reuse
+        surface_light = current_theme.get_color('surface_light')
+        primary_color = current_theme.get_color('primary')
 
         # Draw track background
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(current_theme.get_color('surface_light')))
-        painter.drawRoundedRect(track_rect, 2, 2)
+        painter.setBrush(QBrush(surface_light))
+        if (
+            self._track_rect is not None
+            and self._low_handle_pos is not None
+            and self._high_handle_pos is not None
+        ):
+            painter.drawRoundedRect(self._track_rect, 2, 2)
 
-        # Draw active range
-        active_rect = QRect(
-            track_rect.left() + low_pos,
-            track_rect.top(),
-            high_pos - low_pos,
-            track_rect.height()
-        )
-        painter.setBrush(QBrush(current_theme.get_color('primary')))
-        painter.drawRoundedRect(active_rect, 2, 2)
+            # Draw active range
+            active_rect = QRect(
+                self._track_rect.left() + self._low_handle_pos,
+                self._track_rect.top(),
+                self._high_handle_pos - self._low_handle_pos,
+                self._track_rect.height()
+            )
+            painter.setBrush(QBrush(primary_color))
+            painter.drawRoundedRect(active_rect, 2, 2)
 
-        # Draw handles
-        self._draw_handle(painter, track_rect.left() +
-                          low_pos, rect.height() // 2, 'low')
-        self._draw_handle(painter, track_rect.left() +
-                          high_pos, rect.height() // 2, 'high')
+            # Draw handles
+            self._draw_handle(painter, self._track_rect.left(
+            ) + self._low_handle_pos, self._center_y, 'low')
+            self._draw_handle(painter, self._track_rect.left(
+            ) + self._high_handle_pos, self._center_y, 'high')
 
     def _draw_handle(self, painter: QPainter, x: int, y: int, handle_type: str):
-        """Draw a slider handle"""
+        """Draw a slider handle with optimized styling"""
         current_theme = theme_manager
 
+        # Optimize rect calculation
+        half_size = self._handle_size // 2
         handle_rect = QRect(
-            x - self._handle_size // 2,
-            y - self._handle_size // 2,
+            x - half_size,
+            y - half_size,
             self._handle_size,
             self._handle_size
         )
 
+        # Get colors once and reuse
+        primary = current_theme.get_color('primary')
+        surface = current_theme.get_color('surface')
+
         # Handle styling based on state
         if self._dragging_handle == handle_type:
-            border_color = current_theme.get_color('primary').darker(110)
-            fill_color = current_theme.get_color('surface').darker(105)
+            border_color = primary.darker(110)
+            fill_color = surface.darker(105)
         elif self._is_hovered:
-            border_color = current_theme.get_color('primary').lighter(120)
-            fill_color = current_theme.get_color('surface').lighter(110)
+            border_color = primary.lighter(120)
+            fill_color = surface.lighter(110)
         else:
-            border_color = current_theme.get_color('primary')
-            fill_color = current_theme.get_color('surface')
+            border_color = primary
+            fill_color = surface
 
-        # Draw handle
+        # Draw handle with minimal state changes
         painter.setPen(QPen(border_color, 2))
         painter.setBrush(QBrush(fill_color))
         painter.drawEllipse(handle_rect)
@@ -407,32 +469,37 @@ class FluentRangeSlider(QWidget):
             handle = self._get_handle_at_position(event.position().toPoint())
             if handle:
                 self._dragging_handle = handle
-                # Apply press animation
                 FluentMicroInteraction.scale_animation(self, 1.02)
                 self.update()
 
     def mouseMoveEvent(self, event):
-        """Handle mouse move for dragging handles"""
-        if self._dragging_handle:
-            rect = self.rect()
-            track_width = rect.width() - self._handle_size
-            if track_width == 0:  # Avoid division by zero
-                return
+        """Optimized mouse move for dragging handles"""
+        if not self._dragging_handle:
+            return
 
-            relative_pos = (event.position().x() -
-                            self._handle_size // 2) / track_width
-            relative_pos = max(0, min(1, relative_pos))
+        rect = self.rect()
+        track_width = rect.width() - self._handle_size
+        if track_width <= 0:  # Avoid division by zero
+            return
 
-            new_value = int(self._minimum + relative_pos *
-                            (self._maximum - self._minimum))
+        # Optimize calculation of position
+        x_pos = event.position().x()
+        relative_pos = max(
+            0, min(1, (x_pos - self._handle_size // 2) / track_width))
+        new_value = int(self._minimum + relative_pos *
+                        (self._maximum - self._minimum))
 
-            if self._dragging_handle == 'low':
+        # Only update if value actually changed
+        if self._dragging_handle == 'low':
+            if self._low_value != min(new_value, self._high_value):
                 self._low_value = min(new_value, self._high_value)
-            else:  # 'high'
+                self.range_changing.emit(self._low_value, self._high_value)
+                self.update()
+        else:  # 'high'
+            if self._high_value != max(new_value, self._low_value):
                 self._high_value = max(new_value, self._low_value)
-
-            self.range_changing.emit(self._low_value, self._high_value)
-            self.update()
+                self.range_changing.emit(self._low_value, self._high_value)
+                self.update()
 
     def mouseReleaseEvent(self, _event):
         """Handle mouse release"""
@@ -442,37 +509,47 @@ class FluentRangeSlider(QWidget):
             self.update()
 
     def _get_handle_at_position(self, pos) -> Optional[str]:
-        """Get which handle is at the given position"""
-        rect = self.rect()
-        track_width = rect.width() - self._handle_size
-        value_range = self._maximum - self._minimum
+        """Optimized handle hit testing"""
+        # Calculate layout if not already done
+        if self._track_rect is None:
+            self._calculate_layout()
 
-        if value_range == 0 or track_width == 0:  # Avoid division by zero or invalid state
-            # Check if near the center y, and if x is within handle radius of the start of track
+        # Early exit for invalid states
+        if (
+            self._track_rect is None
+            or self._low_handle_pos is None
+            or self._high_handle_pos is None
+            or self._value_range == 0
+            or self._track_rect.width() == 0
+        ):
             handle_radius = self._handle_size // 2
-            center_y = rect.height() // 2
-            if abs(pos.y() - center_y) <= handle_radius:
-                # If range is 0, both handles are at the start. Prioritize 'low' or check x.
-                if abs(pos.x() - (self._handle_size // 2)) <= handle_radius:
-                    return 'low'  # Or 'high', ambiguous. Let's say 'low'.
+            if abs(pos.y() - self._center_y) <= handle_radius and abs(pos.x() - (self._handle_size // 2)) <= handle_radius:
+                return 'low'
             return None
 
-        low_pos = self._handle_size // 2 + \
-            (self._low_value - self._minimum) / value_range * track_width
-        high_pos = self._handle_size // 2 + \
-            (self._high_value - self._minimum) / value_range * track_width
-
+        # Handle radius for hit testing
         handle_radius = self._handle_size // 2
+        center_y = self._center_y
 
-        if abs(pos.x() - low_pos) <= handle_radius and abs(pos.y() - rect.height() // 2) <= handle_radius:
+        # Calculate distance once and reuse
+        y_dist = abs(pos.y() - center_y)
+        if y_dist > handle_radius:
+            return None
+
+        # Test low handle
+        low_pos = self._track_rect.left() + self._low_handle_pos
+        if abs(pos.x() - low_pos) <= handle_radius:
             return 'low'
-        elif abs(pos.x() - high_pos) <= handle_radius and abs(pos.y() - rect.height() // 2) <= handle_radius:
+
+        # Test high handle
+        high_pos = self._track_rect.left() + self._high_handle_pos
+        if abs(pos.x() - high_pos) <= handle_radius:
             return 'high'
 
         return None
 
     def enterEvent(self, event):
-        """Hover enter event"""
+        """Optimized hover enter event"""
         self._is_hovered = True
         self._state_transition.transitionTo("hovered")
         FluentMicroInteraction.hover_glow(self, 0.1)
@@ -480,75 +557,117 @@ class FluentRangeSlider(QWidget):
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Hover leave event"""
+        """Optimized hover leave event"""
         self._is_hovered = False
         self._state_transition.transitionTo("normal")
         self.update()
         super().leaveEvent(event)
 
     def set_range(self, minimum: int, maximum: int):
-        """Set the range of the slider"""
-        self._minimum = minimum
-        self._maximum = maximum
-        self._low_value = max(minimum, min(maximum, self._low_value))
-        self._high_value = max(minimum, min(maximum, self._high_value))
-        if self._low_value > self._high_value:  # Ensure low <= high
-            self._low_value, self._high_value = self._high_value, self._low_value
-        self.update()
+        """Set the range efficiently"""
+        if minimum != self._minimum or maximum != self._maximum:
+            self._minimum = minimum
+            self._maximum = maximum
+
+            # Update values to stay in range
+            self._low_value = max(minimum, min(maximum, self._low_value))
+            self._high_value = max(minimum, min(maximum, self._high_value))
+
+            # Ensure low <= high
+            if self._low_value > self._high_value:
+                self._low_value, self._high_value = self._high_value, self._low_value
+
+            # Reset cached calculations
+            self._track_rect = None
+            self._value_range = None
+            self.update()
 
     def set_values(self, low_value: int, high_value: int):
-        """Set both values"""
-        self._low_value = max(self._minimum, min(self._maximum, low_value))
-        self._high_value = max(self._minimum, min(self._maximum, high_value))
+        """Set both values efficiently"""
+        update_needed = False
+
+        new_low = max(self._minimum, min(self._maximum, low_value))
+        if new_low != self._low_value:
+            self._low_value = new_low
+            update_needed = True
+
+        new_high = max(self._minimum, min(self._maximum, high_value))
+        if new_high != self._high_value:
+            self._high_value = new_high
+            update_needed = True
+
+        # Ensure low <= high
         if self._low_value > self._high_value:
             self._low_value, self._high_value = self._high_value, self._low_value
-        self.update()
+            update_needed = True
+
+        if update_needed:
+            # Reset cached handle positions
+            self._low_handle_pos = None
+            self._high_handle_pos = None
+            self.update()
 
     def get_values(self) -> tuple[int, int]:
         """Get current values"""
         return (self._low_value, self._high_value)
 
 
-class FluentVolumeSlider(FluentSlider):
-    """Fluent Design Style Volume Slider with icon and mute functionality"""
+class FluentVolumeSlider(QWidget):
+    """Optimized Fluent Design Style Volume Slider with icon and mute functionality"""
 
+    value_changing = Signal(int)  # Emitted while dragging
+    value_changed_final = Signal(int)  # Emitted when drag ends
     mute_toggled = Signal(bool)
 
     def __init__(self, parent: Optional[QWidget] = None, value: int = 50):
-        super().__init__(parent, Qt.Orientation.Horizontal,
-                         self.SliderStyle.ACCENT, self.Size.MEDIUM, 0, 100, value)
+        super().__init__(parent)
 
+        # Setup layout with both slider and icon
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(4)
+
+        # Create volume icon
+        self._volume_icon = QLabel("🔊", self)
+        self._volume_icon.setFixedSize(24, 24)
+        self._volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._volume_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Create the slider as a separate widget
+        self._slider = FluentSlider(
+            self,
+            Qt.Orientation.Horizontal,
+            FluentSlider.SliderStyle.ACCENT,
+            FluentSlider.Size.MEDIUM,
+            0, 100, value
+        )
+
+        # Add widgets to layout in proper order
+        self._layout.addWidget(self._volume_icon)
+        self._layout.addWidget(self._slider, 1)  # Slider gets stretch factor
+
+        # State tracking
         self._is_muted = False
         self._volume_before_mute = value
 
-        # Setup layout with volume icon
-        self._setup_volume_layout()
-
-        # Add volume-specific styling
+        # Setup connections and styling
+        self._setup_connections()
         self._apply_volume_style()
 
-    def _setup_volume_layout(self):
-        """
-        Setup volume icon.
-        The original attempt to create a 'container' QWidget with a layout and
-        inject it into this slider's parent was architecturally flawed and led to
-        the QObject.layout() error.
-        This revised version makes the icon a direct child of the slider.
-        Proper positioning of the icon next to the slider track would require
-        overriding paintEvent or resizeEvent and adjusting slider groove margins.
-        For simplicity in fixing the reported error, the icon is created but
-        hidden by default, as it would otherwise draw on top of the slider track at (0,0).
-        """
-        self._volume_icon = QLabel("🔊", parent=self)
-        self._volume_icon.setFixedSize(24, 24)
-        self._volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Add reveal animation when created
+        FluentRevealEffect.fade_in(self, 300)
+
+    def _setup_connections(self):
+        """Setup optimized signal connections"""
+        # Connect slider signals
+        self._slider.value_changing.connect(self.value_changing.emit)
+        self._slider.value_changed_final.connect(self.value_changed_final.emit)
+
+        # Connect icon click for mute toggle
         self._volume_icon.mousePressEvent = self._toggle_mute
-        self._volume_icon.hide()  # Hide by default as it's not positioned correctly
 
     def _apply_volume_style(self):
-        """Apply volume-specific styling"""
-        super()._apply_style()
-
+        """Apply volume-specific styling efficiently"""
         current_theme = theme_manager
 
         icon_style = f"""
@@ -565,25 +684,30 @@ class FluentVolumeSlider(FluentSlider):
             }}
         """
 
-        if hasattr(self, '_volume_icon'):
-            self._volume_icon.setStyleSheet(icon_style)
+        self._volume_icon.setStyleSheet(icon_style)
+
+        # Apply a container style for proper alignment
+        self.setStyleSheet("""
+            FluentVolumeSlider {
+                background: transparent;
+                border: none;
+            }
+        """)
 
     def _toggle_mute(self, _event=None):
-        """Toggle mute state"""
+        """Toggle mute state efficiently"""
         self._is_muted = not self._is_muted
 
         if self._is_muted:
-            self._volume_before_mute = self.value()
-            self.setValue(0)
-            if hasattr(self, '_volume_icon'):
-                self._volume_icon.setText("🔇")
+            self._volume_before_mute = self._slider.value()
+            self._slider.setValue(0)
+            self._volume_icon.setText("🔇")
         else:
-            self.setValue(self._volume_before_mute)
-            if hasattr(self, '_volume_icon'):
-                self._volume_icon.setText("🔊")
+            self._slider.setValue(self._volume_before_mute)
+            self._volume_icon.setText("🔊")
 
         # Apply mute animation
-        FluentMicroInteraction.pulse_animation(self, 1.1)
+        FluentMicroInteraction.pulse_animation(self._volume_icon, 1.1)
         self.mute_toggled.emit(self._is_muted)
 
     def set_muted(self, muted: bool):
@@ -594,3 +718,17 @@ class FluentVolumeSlider(FluentSlider):
     def is_muted(self) -> bool:
         """Check if volume is muted"""
         return self._is_muted
+
+    def value(self) -> int:
+        """Get current volume value"""
+        return self._slider.value()
+
+    def setValue(self, value: int):
+        """Set volume value"""
+        self._slider.setValue(value)
+
+        # Update mute state if needed
+        if value > 0 and self._is_muted:
+            self.set_muted(False)
+        elif value == 0 and not self._is_muted:
+            self.set_muted(True)

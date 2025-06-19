@@ -4,20 +4,17 @@ Provides modern, performant progress indicators with smooth animations,
 theme integration, and responsive behavior following QFluentWidget patterns.
 """
 
-# Removed QLabel, QHBoxLayout, QVBoxLayout, QGraphicsOpacityEffect
 from PySide6.QtWidgets import (
     QProgressBar, QSlider, QWidget, QGraphicsDropShadowEffect)
 from PySide6.QtCore import (Qt, Signal, QPropertyAnimation, Property, QByteArray,
-                            # Removed QParallelAnimationGroup
                             QEasingCurve, QTimer, QRect, QSequentialAnimationGroup,
-                            QAbstractAnimation, QPoint, QPauseAnimation)  # Removed QVariantAnimation
+                            QAbstractAnimation, QPoint, QPauseAnimation)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QLinearGradient, QPaintEvent, QRadialGradient,
-                           QColor)  # Removed QConicalGradient, QPainterPath, QFont, QFontMetrics
+                           QColor)
 from core.theme import theme_manager
 from core.animation import FluentAnimation
-# Removed FluentMicroInteraction
 from core.enhanced_animations import FluentRevealEffect, FluentTransition
-from typing import Optional  # Removed Union, Callable
+from typing import Optional
 import weakref
 import math
 
@@ -43,6 +40,7 @@ class FluentProgressBar(QProgressBar):
         self._last_painted_value = 0
         self._cached_geometry = QRect()
         self._needs_repaint = True
+        self._current_color = None
 
         # Enhanced animation system
         self._progress_animation = None
@@ -65,8 +63,8 @@ class FluentProgressBar(QProgressBar):
         self._shadow_effect = None
 
         # Ring-specific attributes for circular progress
-        self._ring_width = 8  # Default ring width in pixels
-        self._rotation_angle = 0.0  # Current rotation angle for indeterminate animation
+        self._ring_width = 8
+        self._rotation_angle = 0.0
 
         self.setMinimumHeight(10)
         self.setMaximumHeight(10)
@@ -85,10 +83,10 @@ class FluentProgressBar(QProgressBar):
 
     def _cleanup_animations(self):
         """Clean up animations and timers to prevent memory leaks"""
-        if self._animation_timer:
+        if hasattr(self, '_animation_timer') and self._animation_timer:
             self._animation_timer.stop()
 
-        for animation in self._animation_refs:
+        for animation in list(self._animation_refs):
             if animation and animation.state() == QAbstractAnimation.State.Running:
                 animation.stop()
 
@@ -100,7 +98,6 @@ class FluentProgressBar(QProgressBar):
 
         # Cache colors for performance
         primary_color = theme.get_color('primary')
-        # surface_color = theme.get_color('surface') # Unused
         border_color = theme.get_color('border')
 
         # Enhanced gradient with multiple stops for depth
@@ -230,7 +227,9 @@ class FluentProgressBar(QProgressBar):
             if abs(self._pulse_scale - new_value) > 0.001:  # Check if value actually changed
                 self._pulse_scale = new_value
                 self.pulseScaleChanged.emit(new_value)
-                self._needs_repaint = True    # Property declarations with notify signals
+                self._needs_repaint = True
+
+    # Property declarations with notify signals
     animationPosition = Property(float, _get_animation_position, _set_animation_position,
                                  None, "Animation position for indeterminate progress", animationPositionChanged)
     glowIntensity = Property(float, _get_glow_intensity, _set_glow_intensity,
@@ -342,10 +341,7 @@ class FluentProgressBar(QProgressBar):
         scale_up.setEasingCurve(QEasingCurve.Type.OutBack)
 
         # Hold
-        hold = QPropertyAnimation(self, QByteArray(b"pulseScale"))
-        hold.setStartValue(1.15)
-        hold.setEndValue(1.15)
-        hold.setDuration(FluentAnimation.DURATION_FAST // 2)
+        hold = QPauseAnimation(FluentAnimation.DURATION_FAST // 2)
 
         # Scale down
         scale_down = QPropertyAnimation(self, QByteArray(b"pulseScale"))
@@ -402,7 +398,6 @@ class FluentProgressBar(QProgressBar):
             FluentRevealEffect.fade_in(
                 self, duration=FluentAnimation.DURATION_FAST)
         elif from_state == 'indeterminate':
-
             if self._pulse_animation:
                 self._animate_pulse(1.02, FluentAnimation.DURATION_FAST)
 
@@ -442,11 +437,9 @@ class FluentProgressBar(QProgressBar):
         self._update_style_with_color(primary_color)
 
     def _update_style_with_color(self, color):
-        """Update appearance based on current state color (used in paintEvent)"""
-        # This method is not directly applying stylesheets but can store the color
-        # or simply trigger an update if paintEvent reads the state color.
-        # For FluentProgressRing, colors are typically handled in paintEvent.
-        self._current_color = color  # Example: store color for paintEvent
+        """Update appearance based on current state color"""
+        self._current_color = color
+        self._needs_repaint = True
         self.update()
 
     def pause_animation(self):
@@ -468,8 +461,6 @@ class FluentProgressBar(QProgressBar):
 
     def paintEvent(self, event: QPaintEvent):
         """Enhanced paint event with performance optimizations and visual effects"""
-        # Full paintEvent logic for FluentProgressRing should be here.
-        # This is a simplified version focusing on the error context.
         painter = QPainter(self)
         painter.setRenderHints(
             QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
@@ -488,7 +479,7 @@ class FluentProgressBar(QProgressBar):
         }
         current_color = state_colors.get(
             self._state, theme.get_color('primary'))
-        if hasattr(self, '_current_color'):  # If _update_style_with_color sets it
+        if self._current_color:
             current_color = self._current_color
 
         # Apply pulse scale transform
@@ -512,11 +503,10 @@ class FluentProgressBar(QProgressBar):
 
     def _paint_determinate_ring(self, painter: QPainter, rect: QRect, color: QColor):
         """Paints the determinate progress ring."""
-        painter.setPen(Qt.PenStyle.NoPen)  # Background for the track
+        painter.setPen(Qt.PenStyle.NoPen)
         bg_color = theme_manager.get_color('border')
-        bg_color.setAlpha(100)  # Semi-transparent background track
+        bg_color.setAlpha(100)
         painter.setBrush(bg_color)
-        # painter.drawEllipse(rect) # Full background track
 
         pen = QPen(color)
         pen.setWidth(self._ring_width)
@@ -542,20 +532,8 @@ class FluentProgressBar(QProgressBar):
         painter.setBrush(Qt.BrushStyle.NoBrush)
 
         arc_length = 90.0  # Degrees
-        start_angle = self._rotation_angle  # Current rotation
+        start_angle = 360 * self._animation_position  # Current rotation
         painter.drawArc(rect, int(start_angle * 16), int(arc_length * 16))
-
-    def _paint_determinate_enhanced(self, _event: QPaintEvent):
-        # This method is called by paintEvent if not indeterminate.
-        # The actual drawing is now in _paint_determinate_ring, called by paintEvent.
-        # Effects are also handled by paintEvent.
-        # This method can be removed if paintEvent handles all logic.
-        pass
-
-    def _paint_effects(self, _event: QPaintEvent):
-        # Effects are now handled by paintEvent calling _paint_ring_glow_effect
-        # This method can be removed if paintEvent handles all logic.
-        pass
 
     def _paint_ring_glow_effect(self, painter: QPainter, base_rect: QRect, color: QColor):
         """Paint glow effect around progress ring"""
@@ -563,27 +541,19 @@ class FluentProgressBar(QProgressBar):
             return
 
         glow_color = QColor(color)
-        glow_color.setAlpha(int(self._glow_intensity * 80))  # Adjusted alpha
+        glow_color.setAlpha(int(self._glow_intensity * 80))
 
         glow_pen = QPen(glow_color)
         glow_pen.setWidth(self._ring_width + 4)
-        glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)  # Match ring cap style
+        glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(glow_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
 
-        # Glow rect slightly larger
-        glow_rect = base_rect.adjusted(-2, -2, 2, 2)
-
-        # Align glow drawing with ring drawing logic
-        draw_rect_glow = QRect(base_rect.x() + (self._ring_width+4) // 2 - 2,  # Centering glow pen
-                               base_rect.y() + (self._ring_width+4) // 2 - 2,
-                               base_rect.width() - (self._ring_width+4) + 4,
-                               base_rect.height() - (self._ring_width+4) + 4)
-        draw_rect_glow = base_rect  # Use base_rect for arc, pen width makes it appear outside
+        draw_rect_glow = base_rect
 
         if self._is_indeterminate:
-            arc_length = 90.0  # Degrees, same as indeterminate arc
-            start_angle = self._rotation_angle
+            arc_length = 90.0
+            start_angle = 360 * self._animation_position
             painter.drawArc(draw_rect_glow, int(
                 start_angle * 16), int(arc_length * 16))
         else:
@@ -596,18 +566,13 @@ class FluentProgressBar(QProgressBar):
             painter.drawArc(draw_rect_glow, int(
                 start_angle * 16), int(-span_angle * 16))
 
-    def _paint_indeterminate_optimized(self, _event: QPaintEvent):
-        # This method is called by paintEvent if indeterminate.
-        # The actual drawing is now in _paint_indeterminate_ring, called by paintEvent.
-        # This method can be removed if paintEvent handles all logic.
-        pass
-
     def _on_theme_changed(self, _theme_name: str):
         """Enhanced theme change handling with smooth transition"""
         fade_out_anim = FluentRevealEffect.fade_out(
             self, duration=FluentAnimation.DURATION_FAST)
 
         def _apply_and_fade_in():
+            self._setup_style()
             self.update()
             FluentRevealEffect.fade_in(
                 self, duration=FluentAnimation.DURATION_FAST)
@@ -668,7 +633,7 @@ class FluentSlider(QSlider):
 
     def _cleanup_animations(self):
         """Clean up animations for memory efficiency"""
-        for animation in self._animation_refs:
+        for animation in list(self._animation_refs):
             if animation and animation.state() == QAbstractAnimation.State.Running:
                 animation.stop()
         self._animation_refs.clear()
@@ -689,7 +654,6 @@ class FluentSlider(QSlider):
                         stop:0 {border.lighter(110).name()},
                         stop:1 {border.name()});
                     border-radius: 4px;
-                    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
                 }}
                 QSlider::handle:horizontal {{
                     background: qradialgradient(cx:0.5, cy:0.3, radius:0.8,
@@ -701,7 +665,6 @@ class FluentSlider(QSlider):
                     height: 24px;
                     margin: -10px 0;
                     border-radius: 12px;
-                    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
                 }}
                 QSlider::handle:horizontal:hover {{
                     background: qradialgradient(cx:0.5, cy:0.3, radius:0.8,
@@ -709,16 +672,10 @@ class FluentSlider(QSlider):
                         stop:0.7 {surface.lighter(105).name()},
                         stop:1 {surface.name()});
                     border-width: 4px;
-                    width: 28px;
-                    height: 28px;
-                    margin: -12px 0;
-                    border-radius: 14px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
                 }}
                 QSlider::handle:horizontal:pressed {{
                     background: {primary.lighter(110).name()};
                     border-color: {primary.darker(110).name()};
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                 }}
                 QSlider::sub-page:horizontal {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -726,7 +683,6 @@ class FluentSlider(QSlider):
                         stop:0.5 {primary.lighter(105).name()},
                         stop:1 {primary.lighter(110).name()});
                     border-radius: 4px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 }}
                 QSlider::add-page:horizontal {{
                     background: {border.name()};
@@ -742,7 +698,6 @@ class FluentSlider(QSlider):
                         stop:0 {border.lighter(110).name()},
                         stop:1 {border.name()});
                     border-radius: 4px;
-                    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
                 }}
                 QSlider::handle:vertical {{
                     background: qradialgradient(cx:0.3, cy:0.5, radius:0.8,
@@ -754,7 +709,6 @@ class FluentSlider(QSlider):
                     height: 24px;
                     margin: 0 -10px;
                     border-radius: 12px;
-                    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
                 }}
                 QSlider::handle:vertical:hover {{
                     background: qradialgradient(cx:0.3, cy:0.5, radius:0.8,
@@ -762,11 +716,6 @@ class FluentSlider(QSlider):
                         stop:0.7 {surface.lighter(105).name()},
                         stop:1 {surface.name()});
                     border-width: 4px;
-                    width: 28px;
-                    height: 28px;
-                    margin: 0 -12px;
-                    border-radius: 14px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
                 }}
                 QSlider::sub-page:vertical {{
                     background: qlineargradient(x1:0, y1:1, x2:0, y2:0,
@@ -774,7 +723,6 @@ class FluentSlider(QSlider):
                         stop:0.5 {primary.lighter(105).name()},
                         stop:1 {primary.lighter(110).name()});
                     border-radius: 4px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 }}
                 QSlider::add-page:vertical {{
                     background: {border.name()};
@@ -920,6 +868,7 @@ class FluentSlider(QSlider):
 
             def fade_glow():
                 if self._glow_animation:
+                    self._glow_animation.finished.disconnect()
                     self._glow_animation.setStartValue(0.3)
                     self._glow_animation.setEndValue(0.0)
                     self._glow_animation.setDuration(
@@ -1056,7 +1005,7 @@ class FluentRangeSlider(QWidget):
 
     def _cleanup_animations(self):
         """Clean up animations for memory efficiency"""
-        for animation in self._animation_refs:
+        for animation in list(self._animation_refs):
             if animation and animation.state() == QAbstractAnimation.State.Running:
                 animation.stop()
         self._animation_refs.clear()
@@ -1120,7 +1069,7 @@ class FluentRangeSlider(QWidget):
     def _set_track_glow(self, glow: float):
         if abs(self._track_glow - glow) > 0.01:
             new_glow = max(0.0, min(1.0, glow))
-            if abs(self._track_glow - new_glow) > 0.01:  # Check if value actually changed
+            if abs(self._track_glow - new_glow) > 0.01:
                 self._track_glow = new_glow
                 self.trackGlowChanged.emit(new_glow)
                 self.update()

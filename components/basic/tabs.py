@@ -1,56 +1,69 @@
 """
 Fluent Design Style Tab Component
-Enhanced with modern animations and micro-interactions
+Optimized for high performance with streamlined animations
 """
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget, QPushButton, QScrollArea, QFrame
-from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QRect, Property, QByteArray
-from PySide6.QtGui import QPainter
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget, QPushButton,
+                               QScrollArea, QFrame, QSizePolicy)
+from PySide6.QtCore import (Qt, Signal, QPropertyAnimation, QRect, Property, QEasingCurve, QByteArray,
+                            QTimer)
+from PySide6.QtGui import QPainter, QColor
+from functools import partial
+from typing import Optional, List, Dict, Any
+
+# Import core modules
 from core.theme import theme_manager
 from core.animation import FluentAnimation
 from core.enhanced_animations import FluentTransition, FluentMicroInteraction, FluentRevealEffect
-from typing import Optional, List, Dict, Any
 
 
 class FluentTabButton(QPushButton):
-    """Individual tab button with enhanced animations"""
+    """Optimized tab button with efficient animations"""
+
+    # Class-level style caching for performance
+    _style_cache = {}
+    _theme_connected = False
 
     def __init__(self, text: str, parent: Optional[QWidget] = None):
         super().__init__(text, parent)
 
+        # Essential state variables
         self._is_active = False
         self._hover_progress = 0.0
         self._active_progress = 0.0
-        self._close_button_visible = False
 
+        # Setup appearance
         self.setCheckable(True)
         self.setMinimumHeight(40)
         self.setMinimumWidth(80)
 
-        self._setup_animations()
+        # Apply styles
         self._setup_style()
 
-        if theme_manager:
-            theme_manager.theme_changed.connect(self._on_theme_changed)
+        # Connect theme changes once per class
+        if theme_manager and not FluentTabButton._theme_connected:
+            theme_manager.theme_changed.connect(self._on_theme_class_changed)
+            FluentTabButton._theme_connected = True
 
-    def _setup_animations(self):
-        """Setup enhanced animations"""
-        self._hover_animation = QPropertyAnimation(
-            self, QByteArray(b"hover_progress"))
-        self._hover_animation.setDuration(FluentAnimation.DURATION_FAST)
-        self._hover_animation.setEasingCurve(FluentTransition.EASE_SMOOTH)
-
-        self._active_animation = QPropertyAnimation(
-            self, QByteArray(b"active_progress"))
-        self._active_animation.setDuration(FluentAnimation.DURATION_FAST)
-        self._active_animation.setEasingCurve(FluentTransition.EASE_SPRING)
+    @classmethod
+    def _on_theme_class_changed(cls, _=None):
+        """Update class-level styles when theme changes"""
+        cls._style_cache = {}  # Clear cache
+        # Individual instances will update their styles when needed
 
     def _setup_style(self):
-        """Setup tab button style"""
+        """Setup tab button style with caching"""
         if not theme_manager:
             return
-        theme = theme_manager
 
+        # Use cached style if available based on theme ID
+        theme_id = id(theme_manager)
+        if theme_id in FluentTabButton._style_cache:
+            self.setStyleSheet(FluentTabButton._style_cache[theme_id])
+            return
+
+        # Generate style
+        theme = theme_manager
         style_sheet = f"""
             FluentTabButton {{
                 background-color: transparent;
@@ -73,38 +86,49 @@ class FluentTabButton(QPushButton):
             }}
         """
 
+        # Cache and apply
+        FluentTabButton._style_cache[theme_id] = style_sheet
         self.setStyleSheet(style_sheet)
 
     def _get_hover_progress(self) -> float:
         return self._hover_progress
 
     def _set_hover_progress(self, value: float):
-        self._hover_progress = value
-        self.update()
+        if abs(self._hover_progress - value) > 0.01:  # Only update if significant change
+            self._hover_progress = value
+            self.update()
 
     def _get_active_progress(self) -> float:
         return self._active_progress
 
     def _set_active_progress(self, value: float):
-        self._active_progress = value
-        self.update()
+        if abs(self._active_progress - value) > 0.01:  # Only update if significant change
+            self._active_progress = value
+            self.update()
 
+    # Define properties for animations
     hover_progress = Property(
         float, _get_hover_progress, _set_hover_progress, None, "")
     active_progress = Property(
         float, _get_active_progress, _set_active_progress, None, "")
 
     def setActive(self, active: bool):
-        """Set tab as active with enhanced animation"""
+        """Set tab as active with optimized animation"""
+        if self._is_active == active:
+            return
+
         self._is_active = active
         self.setChecked(active)
 
-        # Enhanced active state animation
-        self._active_animation.setStartValue(self._active_progress)
-        self._active_animation.setEndValue(1.0 if active else 0.0)
-        self._active_animation.start()
+        # Create and start animation
+        active_anim = QPropertyAnimation(self, QByteArray(b"active_progress"))
+        active_anim.setDuration(FluentAnimation.DURATION_FAST)
+        active_anim.setEasingCurve(FluentTransition.EASE_SPRING)
+        active_anim.setStartValue(self._active_progress)
+        active_anim.setEndValue(1.0 if active else 0.0)
+        active_anim.start()
 
-        # Add micro-interaction when becoming active
+        # Add subtle visual feedback when becoming active
         if active:
             FluentMicroInteraction.pulse_animation(self, scale=1.02)
 
@@ -113,99 +137,99 @@ class FluentTabButton(QPushButton):
         return self._is_active
 
     def enterEvent(self, event):
-        """Handle mouse enter with enhanced hover effect"""
+        """Handle mouse enter with optimized hover effect"""
         super().enterEvent(event)
-        
-        # Enhanced hover animation
-        self._hover_animation.setStartValue(self._hover_progress)
-        self._hover_animation.setEndValue(1.0)
-        self._hover_animation.start()
-        
-        # Add subtle glow effect
-        if self._enabled:
-            FluentMicroInteraction.hover_glow(self, intensity=0.1)
+
+        # Create and start hover animation
+        hover_anim = QPropertyAnimation(self, QByteArray(b"hover_progress"))
+        hover_anim.setDuration(FluentAnimation.DURATION_FAST)
+        hover_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        hover_anim.setStartValue(self._hover_progress)
+        hover_anim.setEndValue(1.0)
+        hover_anim.start()
 
     def leaveEvent(self, event):
-        """Handle mouse leave"""
+        """Handle mouse leave with optimized animation"""
         super().leaveEvent(event)
-        self._hover_animation.setStartValue(self._hover_progress)
-        self._hover_animation.setEndValue(0.0)
-        self._hover_animation.start()
+
+        # Create and start hover animation
+        hover_anim = QPropertyAnimation(self, QByteArray(b"hover_progress"))
+        hover_anim.setDuration(FluentAnimation.DURATION_FAST)
+        hover_anim.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        hover_anim.setStartValue(self._hover_progress)
+        hover_anim.setEndValue(0.0)
+        hover_anim.start()
 
     def mousePressEvent(self, event):
-        """Handle mouse press with micro-interaction"""
+        """Handle mouse press with visual feedback"""
         super().mousePressEvent(event)
         if event.button() == Qt.MouseButton.LeftButton:
             FluentMicroInteraction.button_press(self, scale=0.98)
 
     def paintEvent(self, event):
-        """Paint the tab button with enhanced visuals"""
+        """Paint the tab button with optimized rendering"""
         super().paintEvent(event)
 
-        if self._is_active and theme_manager:
+        # Only draw when active or animating to/from active state
+        if self._active_progress > 0.01 and theme_manager:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
             theme = theme_manager
 
-            # Draw enhanced active indicator
+            # Draw active indicator line
             line_height = 3
             line_width = self.width() - 16
             line_x = 8
             line_y = self.height() - line_height
 
-            # Animated line appearance with gradient effect
             current_width = int(line_width * self._active_progress)
             animated_rect = QRect(line_x, line_y, current_width, line_height)
 
-            # Add subtle shadow to the indicator
-            shadow_rect = animated_rect.adjusted(0, 1, 0, 1)
-            shadow_color = theme.get_color('shadow')
-            if shadow_color.isValid():
-                shadow_color.setAlpha(50)
-                painter.fillRect(shadow_rect, shadow_color)
-
+            # Draw the line
             painter.fillRect(animated_rect, theme.get_color('primary'))
-
-    def _on_theme_changed(self, _=None):
-        """Handle theme change"""
-        self._setup_style()
 
 
 class FluentTabWidget(QWidget):
-    """Enhanced Fluent Design style tab widget with modern animations"""
+    """Optimized Fluent Design style tab widget"""
 
     # Signals
-    currentChanged = Signal(int)  # Emitted when current tab changes
-    tabCloseRequested = Signal(int)  # Emitted when tab close is requested
+    currentChanged = Signal(int)
+    tabCloseRequested = Signal(int)
+
+    # Class-level style caching
+    _style_cache = {}
+    _theme_connected = False
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        self._tabs: List[Dict[str, Any]] = []
+        # Single data structure for tab management
+        # Stores {widget, button, text, icon, enabled, visible}
+        self._tabs = []
         self._current_index = -1
-        self._tab_buttons: List[FluentTabButton] = []
+
+        # Configuration
         self._closable_tabs = False
         self._movable_tabs = False
         self._scrollable_tabs = True
 
+        # Setup UI and apply styles
         self._setup_ui()
         self._setup_style()
 
-        if theme_manager:
-            theme_manager.theme_changed.connect(self._on_theme_changed)
+        # Connect theme changes once per class
+        if theme_manager and not FluentTabWidget._theme_connected:
+            theme_manager.theme_changed.connect(self._on_theme_class_changed)
+            FluentTabWidget._theme_connected = True
 
     def _setup_ui(self):
-        """Setup enhanced UI with animations"""
+        """Setup UI with optimized layout"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Enhanced tab bar container
-        self._tab_bar_container = QWidget()
-        self._tab_bar_container.setFixedHeight(50)
-
-        # Scrollable tab bar with smooth scrolling
+        # Tab bar section - optimized for performance
         if self._scrollable_tabs:
             self._tab_scroll = QScrollArea()
             self._tab_scroll.setWidgetResizable(True)
@@ -224,29 +248,47 @@ class FluentTabWidget(QWidget):
             self._tab_scroll.setWidget(self._tab_bar)
             layout.addWidget(self._tab_scroll)
         else:
+            self._tab_bar_container = QWidget()
+            self._tab_bar_container.setFixedHeight(50)
             self._tab_layout = QHBoxLayout(self._tab_bar_container)
             self._tab_layout.setContentsMargins(8, 0, 8, 0)
             self._tab_layout.setSpacing(4)
             self._tab_layout.addStretch()
             layout.addWidget(self._tab_bar_container)
 
-        # Enhanced separator line
+        # Separator line
         self._separator = QFrame()
         self._separator.setFixedHeight(1)
         self._separator.setFrameShape(QFrame.Shape.HLine)
-        layout.insertWidget(1, self._separator)
+        layout.addWidget(self._separator)
 
-        # Content area with reveal animations
+        # Content area
         self._stack = QStackedWidget()
         layout.addWidget(self._stack, 1)
 
+    @classmethod
+    def _on_theme_class_changed(cls, _=None):
+        """Update class-level styles when theme changes"""
+        cls._style_cache = {}  # Clear cache
+
     def _setup_style(self):
-        """Setup enhanced styling"""
+        """Setup widget style with efficient caching"""
         if not theme_manager:
             return
+
+        # Use cached style if available based on theme ID
+        theme_id = id(theme_manager)
+        if theme_id in FluentTabWidget._style_cache:
+            self.setStyleSheet(
+                FluentTabWidget._style_cache[theme_id]['widget'])
+            self._separator.setStyleSheet(
+                FluentTabWidget._style_cache[theme_id]['separator'])
+            return
+
+        # Generate style
         theme = theme_manager
 
-        style_sheet = f"""
+        widget_style = f"""
             FluentTabWidget {{
                 background-color: {theme.get_color('background').name()};
             }}
@@ -271,35 +313,42 @@ class FluentTabWidget(QWidget):
                 background-color: {theme.get_color('primary').name()};
             }}
         """
-        
-        self.setStyleSheet(style_sheet)
-        if hasattr(self, '_separator'):
-            self._separator.setStyleSheet(
-                f"background-color: {theme.get_color('border').name()}; border-radius: 0px;")
+
+        separator_style = f"background-color: {theme.get_color('border').name()}; border-radius: 0px;"
+
+        # Cache and apply
+        FluentTabWidget._style_cache[theme_id] = {
+            'widget': widget_style,
+            'separator': separator_style
+        }
+
+        self.setStyleSheet(widget_style)
+        self._separator.setStyleSheet(separator_style)
 
     def addTab(self, widget: QWidget, text: str, icon=None) -> int:
-        """Add a new tab with reveal animation"""
-        # Create tab data
-        tab_data = {
+        """Add a new tab with optimized reveal animation"""
+        # Create tab button
+        tab_button = FluentTabButton(text)
+
+        # Store all tab information in a single dictionary
+        tab_info = {
             'widget': widget,
+            'button': tab_button,
             'text': text,
             'icon': icon,
             'enabled': True,
             'visible': True
         }
 
-        # Create enhanced tab button
-        tab_button = FluentTabButton(text)
-        new_tab_index = len(self._tabs)
-        tab_button.clicked.connect(
-            lambda checked: self._on_tab_clicked(new_tab_index, checked))
+        # Add to collection
+        index = len(self._tabs)
+        self._tabs.append(tab_info)
 
-        # Add to collections
-        self._tabs.append(tab_data)
-        self._tab_buttons.append(tab_button)
+        # Connect button using partial for efficiency
+        tab_button.clicked.connect(partial(self._on_tab_clicked, index))
 
-        # Add to layouts with reveal animation
-        self._tab_layout.insertWidget(len(self._tab_buttons) - 1, tab_button)
+        # Add to layout
+        self._tab_layout.insertWidget(len(self._tabs) - 1, tab_button)
         self._stack.addWidget(widget)
 
         # Animate new tab appearance
@@ -309,41 +358,35 @@ class FluentTabWidget(QWidget):
         if len(self._tabs) == 1:
             self.setCurrentIndex(0)
 
-        return len(self._tabs) - 1
+        return index
 
     def insertTab(self, index: int, widget: QWidget, text: str, icon=None) -> int:
         """Insert a tab at the specified index with animation"""
         if not (0 <= index <= len(self._tabs)):
             index = len(self._tabs)
 
-        # Create tab data
-        tab_data = {
+        # Create tab button
+        tab_button = FluentTabButton(text)
+
+        # Store tab information
+        tab_info = {
             'widget': widget,
+            'button': tab_button,
             'text': text,
             'icon': icon,
             'enabled': True,
             'visible': True
         }
 
-        # Create enhanced tab button
-        tab_button = FluentTabButton(text)
+        # Insert into collection
+        self._tabs.insert(index, tab_info)
 
-        # Insert into collections
-        self._tabs.insert(index, tab_data)
-        self._tab_buttons.insert(index, tab_button)
-
-        # Update layouts
+        # Update layout
         self._tab_layout.insertWidget(index, tab_button)
         self._stack.insertWidget(index, widget)
 
-        # Update click handlers for all tabs
-        for i, btn in enumerate(self._tab_buttons):
-            try:
-                btn.clicked.disconnect()
-            except RuntimeError:
-                pass
-            btn.clicked.connect(
-                lambda checked, idx=i: self._on_tab_clicked(idx, checked))
+        # Update connections efficiently for affected tabs
+        self._update_tab_connections(index)
 
         # Animate insertion
         FluentRevealEffect.slide_in(tab_button, direction="left")
@@ -356,21 +399,33 @@ class FluentTabWidget(QWidget):
 
         return index
 
+    def _update_tab_connections(self, start_index=0):
+        """Update tab connections efficiently"""
+        for i in range(start_index, len(self._tabs)):
+            btn = self._tabs[i]['button']
+            try:
+                btn.clicked.disconnect()
+            except RuntimeError:
+                pass
+            btn.clicked.connect(partial(self._on_tab_clicked, i))
+
     def removeTab(self, index: int):
         """Remove a tab with fade-out animation"""
         if not (0 <= index < len(self._tabs)):
             return
 
-        tab_button = self._tab_buttons[index]
-        
+        tab_info = self._tabs[index]
+        tab_button = tab_info['button']
+
         # Animate removal
         fade_out = FluentTransition.create_transition(
             tab_button, FluentTransition.FADE, duration=150)
         fade_out.setStartValue(1.0)
         fade_out.setEndValue(0.0)
-        
-        # Remove after animation completes
-        fade_out.finished.connect(lambda: self._complete_tab_removal(index))
+
+        # Complete removal after animation
+        fade_out.finished.connect(
+            lambda idx=index: self._complete_tab_removal(idx))
         fade_out.start()
 
     def _complete_tab_removal(self, index: int):
@@ -378,28 +433,22 @@ class FluentTabWidget(QWidget):
         if not (0 <= index < len(self._tabs)):
             return
 
-        # Remove from collections
-        tab_data = self._tabs.pop(index)
-        tab_button = self._tab_buttons.pop(index)
+        tab_info = self._tabs[index]
 
-        # Remove from layouts
-        self._tab_layout.removeWidget(tab_button)
-        self._stack.removeWidget(tab_data['widget'])
+        # Remove from UI
+        self._tab_layout.removeWidget(tab_info['button'])
+        self._stack.removeWidget(tab_info['widget'])
 
         # Clean up
-        tab_button.deleteLater()
-        tab_data['widget'].deleteLater()
+        tab_info['button'].deleteLater()
 
-        # Update click handlers
-        for i, btn in enumerate(self._tab_buttons):
-            try:
-                btn.clicked.disconnect()
-            except RuntimeError:
-                pass
-            btn.clicked.connect(
-                lambda checked, idx=i: self._on_tab_clicked(idx, checked))
+        # Remove from collection
+        self._tabs.pop(index)
 
-        # Adjust current index
+        # Update connections for affected tabs
+        self._update_tab_connections(index)
+
+        # Update current index efficiently
         if len(self._tabs) == 0:
             self._current_index = -1
         elif self._current_index == index:
@@ -408,46 +457,51 @@ class FluentTabWidget(QWidget):
         elif self._current_index > index:
             self._current_index -= 1
 
-        if self._current_index >= len(self._tabs) and len(self._tabs) > 0:
-            self.setCurrentIndex(len(self._tabs) - 1)
-
     def setCurrentIndex(self, index: int):
         """Set the current tab with smooth transition"""
-        if not (0 <= index < len(self._tabs)) or index == self._current_index:
+        if index == self._current_index:
+            return
+
+        if not (0 <= index < len(self._tabs)) and index != -1:
             if len(self._tabs) == 0 and self._current_index != -1:
-                if self._current_index >= 0 and self._current_index < len(self._tab_buttons):
-                    self._tab_buttons[self._current_index].setActive(False)
+                if self._current_index >= 0 and self._current_index < len(self._tabs):
+                    self._tabs[self._current_index]['button'].setActive(False)
                 self._current_index = -1
                 self._stack.setCurrentIndex(-1)
                 self.currentChanged.emit(-1)
             return
 
-        # Deactivate previous tab with animation
-        if self._current_index >= 0 and self._current_index < len(self._tab_buttons):
-            self._tab_buttons[self._current_index].setActive(False)
-
-        # Activate new tab with enhanced animation
-        self._current_index = index
-        if self._current_index < len(self._tab_buttons):
-            self._tab_buttons[index].setActive(True)
-            
-            # Animate content transition
-            new_widget = self._tabs[index]['widget']
-            self._stack.setCurrentIndex(index)
-            
-            # Add reveal effect to new content
-            FluentRevealEffect.fade_in(new_widget, duration=200)
-            
-            self.currentChanged.emit(index)
-        else:
+        # Handle special case for clearing selection
+        if index == -1:
+            if 0 <= self._current_index < len(self._tabs):
+                self._tabs[self._current_index]['button'].setActive(False)
             self._current_index = -1
             self._stack.setCurrentIndex(-1)
             self.currentChanged.emit(-1)
+            return
+
+        # Deactivate previous tab
+        if 0 <= self._current_index < len(self._tabs):
+            self._tabs[self._current_index]['button'].setActive(False)
+
+        # Activate new tab
+        self._current_index = index
+        self._tabs[index]['button'].setActive(True)
+
+        # Change content with animation
+        new_widget = self._tabs[index]['widget']
+        self._stack.setCurrentWidget(new_widget)
+
+        # Add subtle reveal effect
+        FluentRevealEffect.fade_in(new_widget, duration=150)
+
+        # Emit signal
+        self.currentChanged.emit(index)
 
     def setCurrentWidget(self, widget: QWidget):
         """Set the current tab by widget"""
-        for i, tab_data in enumerate(self._tabs):
-            if tab_data['widget'] == widget:
+        for i, tab_info in enumerate(self._tabs):
+            if tab_info['widget'] == widget:
                 self.setCurrentIndex(i)
                 break
 
@@ -481,7 +535,7 @@ class FluentTabWidget(QWidget):
         """Set tab text at index"""
         if 0 <= index < len(self._tabs):
             self._tabs[index]['text'] = text
-            self._tab_buttons[index].setText(text)
+            self._tabs[index]['button'].setText(text)
 
     def tabEnabled(self, index: int) -> bool:
         """Check if tab is enabled"""
@@ -492,14 +546,25 @@ class FluentTabWidget(QWidget):
     def setTabEnabled(self, index: int, enabled: bool):
         """Set tab enabled state with visual feedback"""
         if 0 <= index < len(self._tabs):
+            if self._tabs[index]['enabled'] == enabled:
+                return
+
             self._tabs[index]['enabled'] = enabled
-            self._tab_buttons[index].setEnabled(enabled)
-            
+            self._tabs[index]['button'].setEnabled(enabled)
+
             # Add visual feedback for disabled state
             if not enabled:
-                FluentTransition.create_transition(
-                    self._tab_buttons[index], FluentTransition.FADE, duration=150
-                ).setEndValue(0.5)
+                anim = QPropertyAnimation(
+                    self._tabs[index]['button'], QByteArray(b"windowOpacity"))
+                anim.setDuration(150)
+                anim.setEndValue(0.5)
+                anim.start()
+            else:
+                anim = QPropertyAnimation(
+                    self._tabs[index]['button'], QByteArray(b"windowOpacity"))
+                anim.setDuration(150)
+                anim.setEndValue(1.0)
+                anim.start()
 
     def tabVisible(self, index: int) -> bool:
         """Check if tab is visible"""
@@ -509,22 +574,28 @@ class FluentTabWidget(QWidget):
 
     def setTabVisible(self, index: int, visible: bool):
         """Set tab visibility with animation"""
-        if 0 <= index < len(self._tabs):
-            self._tabs[index]['visible'] = visible
-            
-            if visible:
-                self._tab_buttons[index].setVisible(True)
-                FluentRevealEffect.scale_in(self._tab_buttons[index])
-            else:
-                fade_out = FluentTransition.create_transition(
-                    self._tab_buttons[index], FluentTransition.FADE, duration=150)
-                fade_out.setEndValue(0.0)
-                fade_out.finished.connect(
-                    lambda: self._tab_buttons[index].setVisible(False))
-                fade_out.start()
+        if not (0 <= index < len(self._tabs)):
+            return
+
+        if self._tabs[index]['visible'] == visible:
+            return
+
+        self._tabs[index]['visible'] = visible
+        tab_button = self._tabs[index]['button']
+
+        if visible:
+            tab_button.setVisible(True)
+            FluentRevealEffect.scale_in(tab_button)
+        else:
+            fade_out = FluentTransition.create_transition(
+                tab_button, FluentTransition.FADE, duration=150)
+            fade_out.setStartValue(1.0)
+            fade_out.setEndValue(0.0)
+            fade_out.finished.connect(lambda: tab_button.setVisible(False))
+            fade_out.start()
 
     def setTabsClosable(self, closable: bool):
-        """Set whether tabs can be closed"""
+        """Set whether tabs can be closable"""
         self._closable_tabs = closable
         # Implementation for close buttons would go here
 
@@ -542,28 +613,39 @@ class FluentTabWidget(QWidget):
         return self._movable_tabs
 
     def clear(self):
-        """Remove all tabs with staggered animation"""
-        if len(self._tabs) > 0:
-            # Animate removal of all tabs
-            FluentRevealEffect.staggered_reveal(
-                [btn for btn in reversed(self._tab_buttons)], stagger_delay=50)
-            
-        # Clear after animations
+        """Remove all tabs with optimized approach"""
+        if not self._tabs:
+            return
+
+        # Get buttons for animation
+        buttons = [tab['button'] for tab in reversed(self._tabs)]
+
+        # Start staggered animations
+        FluentRevealEffect.staggered_reveal(buttons, stagger_delay=50)
+
+        # Clean up after animations complete
+        cleanup_delay = len(buttons) * 50 + 150  # Total animation time
+        QTimer.singleShot(cleanup_delay, self._complete_clear)
+
+    def _complete_clear(self):
+        """Complete the clear operation"""
         while self.count() > 0:
             self.removeTab(0)
 
-    def _on_tab_clicked(self, index: int, checked: bool):
-        """Handle tab button click with micro-interaction"""
+    def _on_tab_clicked(self, index: int, checked=False):
+        """Handle tab button click with optimized feedback"""
         # Reference checked parameter to avoid warning
         _ = checked
-        
+
         if 0 <= index < len(self._tabs) and self._tabs[index]['enabled']:
-            # Add click feedback
-            FluentMicroInteraction.ripple_effect(self._tab_buttons[index])
+            # Add visual feedback
+            FluentMicroInteraction.ripple_effect(self._tabs[index]['button'])
             self.setCurrentIndex(index)
 
     def _on_theme_changed(self, _=None):
-        """Handle theme change"""
+        """Handle theme change efficiently"""
         self._setup_style()
-        for btn in self._tab_buttons:
-            btn._on_theme_changed()
+
+        # Update tab buttons
+        for tab_info in self._tabs:
+            tab_info['button']._setup_style()

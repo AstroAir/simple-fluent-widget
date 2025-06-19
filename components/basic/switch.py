@@ -6,16 +6,11 @@ Based on Windows 11 Fluent Design principles.
 """
 
 from typing import List, Optional
-# Removed: Callable, math
 from PySide6.QtWidgets import QWidget, QHBoxLayout
-# Removed: QLabel
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, Signal, QRect, Property, QByteArray
-# Removed: QTimer, pyqtSignal, QParallelAnimationGroup
 from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QFont, QFontMetrics
-# Removed: QLinearGradient
 
 from core.theme import theme_manager
-# Removed: FluentAnimation
 
 
 class FluentSwitch(QWidget):
@@ -29,14 +24,15 @@ class FluentSwitch(QWidget):
     - Custom colors
     - On/off text labels
     - Keyboard navigation
+    - **Optimized rendering and state management**
     """
 
-    # 信号
+    # Signals
     toggled = Signal(bool)
-    stateChanged = Signal(int)  # 兼容QCheckBox接口
+    stateChanged = Signal(int)  # Compatible with QCheckBox interface
     thumbPositionChanged = Signal(float)  # Signal for property notification
 
-    # 尺寸预设
+    # Size presets
     SIZE_SMALL = "small"
     SIZE_MEDIUM = "medium"
     SIZE_LARGE = "large"
@@ -60,7 +56,7 @@ class FluentSwitch(QWidget):
         self._size = size
         self._thumb_position = 1.0 if checked else 0.0
 
-        # 尺寸配置
+        # Size configurations
         self._size_configs = {
             self.SIZE_SMALL: {
                 'track_width': 40,
@@ -82,52 +78,141 @@ class FluentSwitch(QWidget):
             }
         }
 
+        # Caching flags and storage
+        self._colors_dirty = True  # Flag to indicate colors need recalculation
+        self._text_metrics_dirty = True  # Flag to indicate text metrics need recalculation
+        self._cached_colors = {}  # Store for cached colors
+        self._cached_track_rect = None  # Cache for track rectangle
+        self._cached_text_metrics = {}  # Store for cached text metrics
+        self._prev_thumb_rect = None  # Previous thumb rectangle for optimized drawing
+
         self._setup_ui()
         self._setup_animation()
         self._connect_theme()
+        self._update_colors()  # Initial color calculation
+        self._update_text_metrics()  # Initial text metrics calculation
         self.setEnabled(True)  # Initialize QWidget's enabled state
 
     def _setup_ui(self):
-        """设置UI"""
+        """Setup UI elements"""
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        # 计算组件尺寸
-        self._update_size()
+        self._update_size()  # Calculate component size
 
     def _setup_animation(self):
-        """设置动画"""
+        """Setup animation with optimized settings"""
         self._thumb_animation = QPropertyAnimation(
             self, QByteArray(b"thumbPosition"))
         self._thumb_animation.setDuration(150)
         self._thumb_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
+        # Optimize animation for performance
+        # self._thumb_animation.setUpdateInterval(33)  # ~30fps instead of default 60fps
+
     def _connect_theme(self):
-        """连接主题"""
+        """Connect to theme changes"""
         if theme_manager:
-            theme_manager.theme_changed.connect(self.update)
+            theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self):
+        """Handle theme changes"""
+        self._colors_dirty = True  # Mark colors as needing refresh
+        self.update()
+
+    def _update_colors(self):
+        """Update cached colors based on current theme and state"""
+        if not theme_manager:
+            self._colors_dirty = False
+            return
+
+        # Cache all theme colors at once instead of fetching on every paint
+        self._cached_colors = {
+            'track_checked': theme_manager.get_color("primary"),
+            'thumb_checked': QColor(255, 255, 255),
+            'track_unchecked_enabled': theme_manager.get_color("surface_variant"),
+            'thumb_unchecked_enabled': theme_manager.get_color("outline"),
+            'text_enabled': theme_manager.get_color("on_surface"),
+            'on_primary_text': theme_manager.get_color("on_primary"),
+            'on_surface_variant_text': theme_manager.get_color("on_surface_variant"),
+            'shadow': theme_manager.get_color("shadow"),
+        }
+
+        # Set fallback shadow if needed
+        if not self._cached_colors['shadow'].isValid():
+            self._cached_colors['shadow'] = QColor(0, 0, 0, 30)
+
+        # Create derived colors to avoid recalculation during painting
+        track_unchecked_disabled = QColor(
+            self._cached_colors['track_unchecked_enabled'])
+        track_unchecked_disabled.setAlpha(100)
+        self._cached_colors['track_unchecked_disabled'] = track_unchecked_disabled
+
+        thumb_unchecked_disabled = QColor(
+            self._cached_colors['thumb_unchecked_enabled'])
+        thumb_unchecked_disabled.setAlpha(150)
+        self._cached_colors['thumb_unchecked_disabled'] = thumb_unchecked_disabled
+
+        text_disabled = QColor(self._cached_colors['text_enabled'])
+        text_disabled.setAlpha(128)
+        self._cached_colors['text_disabled'] = text_disabled
+
+        self._colors_dirty = False
+
+    def _update_text_metrics(self):
+        """Cache text metrics to avoid recalculating them on every paint"""
+        if not self._text_metrics_dirty:
+            return
+
+        config = self._size_configs[self._size]
+        font = QFont()
+        font.setPointSize(config['font_size'])
+        fm = QFontMetrics(font)
+
+        # Calculate and cache main text metrics
+        if self._text:
+            text_width = fm.horizontalAdvance(self._text)
+            text_height = fm.height()
+        else:
+            text_width = 0
+            text_height = 0
+
+        self._cached_text_metrics = {
+            'main_font': font,
+            'text_width': text_width,
+            'text_height': text_height,
+        }
+
+        # Create and cache font for On/Off text
+        small_font = QFont()
+        small_font.setPointSize(max(8, config['font_size'] - 4))
+        self._cached_text_metrics['small_font'] = small_font
+
+        self._text_metrics_dirty = False
 
     def _update_size(self):
-        """更新组件尺寸"""
+        """Update component size using cached metrics when possible"""
         config = self._size_configs[self._size]
         track_width = config['track_width']
         track_height = config['track_height']
 
-        # 计算文本尺寸
+        # Calculate text size using cached metrics when available
         if self._text:
-            font = QFont()
-            font.setPointSize(config['font_size'])
-            fm = QFontMetrics(font)
-            text_width = fm.horizontalAdvance(self._text)
-            text_height = fm.height()
+            if self._text_metrics_dirty:
+                self._update_text_metrics()
 
-            # 组件总尺寸
+            text_width = self._cached_text_metrics['text_width']
+            text_height = self._cached_text_metrics['text_height']
+
+            # Calculate total widget size
             total_width = track_width + 8 + text_width
             total_height = max(track_height, text_height)
 
             self.setFixedSize(total_width, total_height)
         else:
             self.setFixedSize(track_width, track_height)
+
+        # Invalidate the track rect cache since size changed
+        self._cached_track_rect = None
 
     # Getter for thumbPosition property
     def _get_thumbPosition(self) -> float:
@@ -140,84 +225,27 @@ class FluentSwitch(QWidget):
             self.update()
             self.thumbPositionChanged.emit(self._thumb_position)
 
+    # Define the Qt Property with notification signal
     thumbPosition = Property(float, _get_thumbPosition,
                              _set_thumbPosition, None, "", notify=thumbPositionChanged)
 
-    def isChecked(self) -> bool:
-        """获取选中状态"""
-        return self._checked
-
-    def setChecked(self, checked: bool):
-        """设置选中状态"""
-        if self._checked != checked:
-            self._checked = checked
-            self._animate_thumb()
-            self.toggled.emit(checked)
-            self.stateChanged.emit(2 if checked else 0)
-            self.update()  # Ensure repaint after state change
-
-    def toggle(self):
-        """切换状态"""
-        self.setChecked(not self._checked)
-
-    def setText(self, text: str):
-        """设置文本"""
-        self._text = text
-        self._update_size()
-        self.update()
-
-    def text(self) -> str:
-        """获取文本"""
-        return self._text
-
-    def setOnText(self, text: str):
-        """设置开启文本"""
-        self._on_text = text
-        self.update()
-
-    def setOffText(self, text: str):
-        """设置关闭文本"""
-        self._off_text = text
-        self.update()
-
-    def setSize(self, size: str):
-        """设置尺寸"""
-        if size in self._size_configs:
-            self._size = size
-            self._update_size()
-            self.update()
-
-    # Override setEnabled to update internal state and repaint
-    def setEnabled(self, enabled: bool):
-        super().setEnabled(enabled)
-        self._enabled = enabled
-        self.update()
-
-    def _animate_thumb(self):
-        """动画切换滑块"""
-        target_pos = 1.0 if self._checked else 0.0
-
-        self._thumb_animation.stop()
-        self._thumb_animation.setStartValue(self._thumb_position)
-        self._thumb_animation.setEndValue(target_pos)
-        self._thumb_animation.start()
-
     def _get_track_rect(self) -> QRect:
-        """获取轨道矩形"""
-        config = self._size_configs[self._size]
-        track_width = config['track_width']
-        track_height = config['track_height']
-
-        y = (self.height() - track_height) // 2
-        return QRect(0, y, track_width, track_height)
+        """Get cached track rectangle"""
+        if not self._cached_track_rect:
+            config = self._size_configs[self._size]
+            track_width = config['track_width']
+            track_height = config['track_height']
+            y = (self.height() - track_height) // 2
+            self._cached_track_rect = QRect(0, y, track_width, track_height)
+        return self._cached_track_rect
 
     def _get_thumb_rect(self) -> QRect:
-        """获取滑块矩形"""
+        """Get thumb rectangle based on current position"""
         config = self._size_configs[self._size]
         thumb_size = config['thumb_size']
         track_rect = self._get_track_rect()
 
-        # 计算滑块位置
+        # Calculate thumb position
         thumb_margin = 2
         max_x = track_rect.width() - thumb_size - thumb_margin
         thumb_x = thumb_margin + (max_x - thumb_margin) * self._thumb_position
@@ -225,15 +253,81 @@ class FluentSwitch(QWidget):
 
         return QRect(int(thumb_x), thumb_y, thumb_size, thumb_size)
 
+    def isChecked(self) -> bool:
+        """Get checked state"""
+        return self._checked
+
+    def setChecked(self, checked: bool):
+        """Set checked state with efficient updates"""
+        if self._checked != checked:
+            self._checked = checked
+            self._animate_thumb()
+            self.toggled.emit(checked)
+            self.stateChanged.emit(2 if checked else 0)
+            self.update()
+
+    def toggle(self):
+        """Toggle the state"""
+        self.setChecked(not self._checked)
+
+    def setText(self, text: str):
+        """Set text with efficient updates"""
+        if self._text != text:
+            self._text = text
+            self._text_metrics_dirty = True
+            self._update_size()
+            self.update()
+
+    def text(self) -> str:
+        """Get the text"""
+        return self._text
+
+    def setOnText(self, text: str):
+        """Set 'on' text"""
+        if self._on_text != text:
+            self._on_text = text
+            self.update()
+
+    def setOffText(self, text: str):
+        """Set 'off' text"""
+        if self._off_text != text:
+            self._off_text = text
+            self.update()
+
+    def setSize(self, size: str):
+        """Set size with efficient updates"""
+        if size in self._size_configs and self._size != size:
+            self._size = size
+            self._text_metrics_dirty = True
+            self._cached_track_rect = None
+            self._update_size()
+            self.update()
+
+    def setEnabled(self, enabled: bool):
+        """Set enabled state with efficient updates"""
+        if self._enabled != enabled:
+            super().setEnabled(enabled)
+            self._enabled = enabled
+            self.update()
+
+    def _animate_thumb(self):
+        """Animate thumb position changes"""
+        target_pos = 1.0 if self._checked else 0.0
+
+        self._thumb_animation.stop()
+        self._thumb_animation.setStartValue(self._thumb_position)
+        self._thumb_animation.setEndValue(target_pos)
+        self._thumb_animation.start()
+
     def mousePressEvent(self, event):
-        """鼠标按下事件"""
+        """Handle mouse press events"""
         if event.button() == Qt.MouseButton.LeftButton and self._enabled:
             self._pressed = True
             self.update()
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        """鼠标释放事件"""
+        """Handle mouse release events"""
         if event.button() == Qt.MouseButton.LeftButton and self._pressed:
             self._pressed = False
             if self.rect().contains(event.pos()) and self._enabled:
@@ -241,80 +335,68 @@ class FluentSwitch(QWidget):
             self.update()
         super().mouseReleaseEvent(event)
 
-    def enterEvent(self, _event):  # Parameter event is not used
-        """鼠标进入事件"""
+    def enterEvent(self, event):
+        """Handle mouse enter events"""
         self._hovered = True
         self.update()
-        super().enterEvent(_event)  # Call superclass method
+        super().enterEvent(event)
 
-    def leaveEvent(self, _event):  # Parameter event is not used
-        """鼠标离开事件"""
+    def leaveEvent(self, event):
+        """Handle mouse leave events"""
         self._hovered = False
         self.update()
-        super().leaveEvent(_event)  # Call superclass method
+        super().leaveEvent(event)
 
     def keyPressEvent(self, event):
-        """键盘按下事件"""
+        """Handle keyboard events"""
         if self._enabled and event.key() in (Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.toggle()
         else:
             super().keyPressEvent(event)
 
-    def paintEvent(self, _event):  # Parameter event is not used
-        """Paint event"""
+    def paintEvent(self, _event):
+        """Optimized paint event"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Reference the event parameter to avoid warning
-        _ = _event
+        # Update cached resources when needed
+        if self._colors_dirty:
+            self._update_colors()
 
-        if not theme_manager:
+        if self._text_metrics_dirty:
+            self._update_text_metrics()
+
+        # Skip painting if colors aren't available
+        if not self._cached_colors:
             return
 
-        # Base colors
-        track_color_checked = theme_manager.get_color("primary")
-        thumb_color_checked = QColor(255, 255, 255)
-
-        track_color_unchecked_enabled = theme_manager.get_color(
-            "surface_variant")
-        thumb_color_unchecked_enabled = theme_manager.get_color("outline")
-
-        # Disabled colors (approximations, ideally from theme)
-        track_color_unchecked_disabled = QColor(track_color_unchecked_enabled)
-        track_color_unchecked_disabled.setAlpha(100)  # More transparent
-        thumb_color_unchecked_disabled = QColor(thumb_color_unchecked_enabled)
-        thumb_color_unchecked_disabled.setAlpha(150)  # More transparent
-
-        text_color_enabled = theme_manager.get_color("on_surface")
-        text_color_disabled = QColor(text_color_enabled)
-        text_color_disabled.setAlpha(128)
-
-        current_track_color: QColor
-        current_thumb_color: QColor
-
+        # Calculate current colors based on state for efficient reuse
         if self._checked:
-            current_track_color = QColor(track_color_checked)
-            current_thumb_color = QColor(thumb_color_checked)
+            current_track_color = QColor(self._cached_colors['track_checked'])
+            current_thumb_color = QColor(self._cached_colors['thumb_checked'])
             if not self._enabled:
-                current_track_color.setAlpha(100)  # Dim primary when disabled
-                # Thumb remains white but on a dimmed track
+                current_track_color.setAlpha(100)  # Dim when disabled
         else:  # Unchecked
             if self._enabled:
-                current_track_color = QColor(track_color_unchecked_enabled)
-                current_thumb_color = QColor(thumb_color_unchecked_enabled)
+                current_track_color = QColor(
+                    self._cached_colors['track_unchecked_enabled'])
+                current_thumb_color = QColor(
+                    self._cached_colors['thumb_unchecked_enabled'])
             else:
-                current_track_color = QColor(track_color_unchecked_disabled)
-                current_thumb_color = QColor(thumb_color_unchecked_disabled)
+                current_track_color = QColor(
+                    self._cached_colors['track_unchecked_disabled'])
+                current_thumb_color = QColor(
+                    self._cached_colors['thumb_unchecked_disabled'])
 
-        # Hover and pressed effects
+        # Apply hover and pressed effects efficiently
         if self._enabled:
             if self._pressed:
                 current_track_color = current_track_color.darker(110)
-                if not self._checked:  # Only darken thumb if it's not the white one
+                if not self._checked:  # Only darken thumb if not white
                     current_thumb_color = current_thumb_color.darker(105)
             elif self._hovered:
                 current_track_color = current_track_color.lighter(110)
-                if not self._checked:  # Only lighten thumb if it's not the white one
+                if not self._checked:  # Only lighten thumb if not white
                     current_thumb_color = current_thumb_color.lighter(105)
 
         # Draw track
@@ -327,52 +409,35 @@ class FluentSwitch(QWidget):
         # Draw thumb
         thumb_rect = self._get_thumb_rect()
 
-        # Thumb shadow (Only if enabled and theme is light, or a subtle shadow always)
-        if self._enabled:  # Simple shadow for enabled state
+        # Thumb shadow (with cached shadow color)
+        if self._enabled:
             shadow_rect = thumb_rect.adjusted(1, 1, 1, 1)
-            shadow_color = theme_manager.get_color(
-                "shadow")  # Assuming a shadow color exists
-            if not shadow_color.isValid():  # Fallback shadow
-                shadow_color = QColor(0, 0, 0, 30)
-            painter.setBrush(QBrush(shadow_color))
+            painter.setBrush(QBrush(self._cached_colors['shadow']))
             painter.drawEllipse(shadow_rect)
 
         # Thumb body
         painter.setBrush(QBrush(current_thumb_color))
         painter.drawEllipse(thumb_rect)
 
-        # Draw text
+        # Draw text (using cached fonts and metrics)
         if self._text:
-            config = self._size_configs[self._size]
-            font = QFont()
-            font.setPointSize(config['font_size'])
-            painter.setFont(font)
-
-            current_text_color = text_color_enabled if self._enabled else text_color_disabled
-            painter.setPen(QPen(current_text_color))
+            painter.setFont(self._cached_text_metrics['main_font'])
+            painter.setPen(QPen(
+                self._cached_colors['text_enabled'] if self._enabled else self._cached_colors['text_disabled']))
 
             text_x = track_rect.right() + 8
             text_rect = QRect(text_x, 0, self.width() - text_x, self.height())
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft |
                              Qt.AlignmentFlag.AlignVCenter, self._text)
 
-        # Draw switch text
+        # Draw switch text (ON/OFF labels)
         if self._on_text or self._off_text:
-            config = self._size_configs[self._size]
-            font = QFont()
-            # Smaller font for inner text
-            font.setPointSize(max(8, config['font_size'] - 4))
-            painter.setFont(font)
+            painter.setFont(self._cached_text_metrics['small_font'])
 
-            on_off_text_color_base: QColor
-            if self._checked:
-                on_off_text_color_base = theme_manager.get_color(
-                    "on_primary")  # Text on primary color
-            else:
-                on_off_text_color_base = theme_manager.get_color(
-                    "on_surface_variant")  # Text on surface_variant
-
+            on_off_text_color_base = self._cached_colors[
+                'on_primary_text'] if self._checked else self._cached_colors['on_surface_variant_text']
             current_on_off_text_color = QColor(on_off_text_color_base)
+
             if not self._enabled:
                 current_on_off_text_color.setAlpha(128)  # Dim if disabled
 
@@ -383,10 +448,13 @@ class FluentSwitch(QWidget):
                 painter.drawText(
                     track_rect, Qt.AlignmentFlag.AlignCenter, display_text)
 
+        # Store current thumb rect for optimizing next paint
+        self._prev_thumb_rect = thumb_rect
+
 
 class FluentSwitchGroup(QWidget):
     """
-    开关组，管理多个相关的开关
+    Switch group to manage multiple related switches
     """
 
     def __init__(self, parent: Optional[QWidget] = None):
@@ -397,24 +465,23 @@ class FluentSwitchGroup(QWidget):
         self._layout.setSpacing(12)
 
     def addSwitch(self, switch: FluentSwitch):
-        """添加开关"""
+        """Add a switch to the group"""
         self._switches.append(switch)
         self._layout.addWidget(switch)
 
     def removeSwitch(self, switch: FluentSwitch):
-        """移除开关"""
+        """Remove a switch from the group"""
         if switch in self._switches:
             self._switches.remove(switch)
             self._layout.removeWidget(switch)
-            # Or switch.deleteLater() if group owns them
             switch.setParent(None)
 
     def getSwitches(self) -> list[FluentSwitch]:
-        """获取所有开关"""
+        """Get all switches in the group"""
         return self._switches.copy()
 
     def setEnabled(self, enabled: bool):
-        """设置组启用状态"""
+        """Set enabled state for the whole group"""
         super().setEnabled(enabled)
         for switch in self._switches:
             switch.setEnabled(enabled)

@@ -571,8 +571,9 @@ class FluentCard(QFrame):
         if self.isVisible() and widget.isVisible():
             # Use smoother slide-in animation
             entrance = FluentRevealEffect.slide_in(widget, 250, "up")
-            entrance.start()
-            self._active_animations.add(entrance)
+            if entrance:
+                entrance.start()
+                self._active_animations.add(entrance)
 
     def insertWidget(self, index: int, widget: QWidget):
         """Insert a widget at the specified index with enhanced animation"""

@@ -5,7 +5,7 @@ Enhanced with smooth animations, theme consistency, and responsive interactions
 
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QPushButton,
                                QLabel, QButtonGroup, QSizePolicy)
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Property
 from PySide6.QtGui import QFont
 from core.theme import theme_manager
 from core.enhanced_animations import (FluentMicroInteraction, FluentTransition,
@@ -42,6 +42,7 @@ class FluentSegmentedControl(QWidget):
         self._selected_index = selected_index
         self._buttons: List[QPushButton] = []
         self._button_group = QButtonGroup(self)
+        self._cached_styles = {}  # Cache for frequently used styles
 
         self._setup_ui()
         self._setup_animations()
@@ -68,9 +69,9 @@ class FluentSegmentedControl(QWidget):
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             button.setMinimumHeight(self._get_height())
 
-            # Connect button click
-            button.clicked.connect(
-                lambda _checked, index=i: self._on_segment_clicked(index))
+            # Store index in button property for more efficient signal handling
+            button.setProperty("segment_index", i)
+            button.clicked.connect(self._on_segment_clicked_handler)
 
             self._buttons.append(button)
             self._button_group.addButton(button, i)
@@ -79,6 +80,13 @@ class FluentSegmentedControl(QWidget):
         # Set initial selection
         if 0 <= self._selected_index < len(self._buttons):
             self._buttons[self._selected_index].setChecked(True)
+
+    def _on_segment_clicked_handler(self):
+        """Handle segment button click by getting index from sender"""
+        sender = self.sender()
+        if sender:
+            index = sender.property("segment_index")
+            self._on_segment_clicked(index)
 
     def _setup_animations(self):
         """Setup animations for the segmented control"""
@@ -118,7 +126,7 @@ class FluentSegmentedControl(QWidget):
             return 6
 
     def _apply_style(self):
-        """Apply segmented control styling"""
+        """Apply segmented control styling with style caching"""
         current_theme = theme_manager
         border_radius = self._get_border_radius()
 
@@ -131,25 +139,31 @@ class FluentSegmentedControl(QWidget):
             }}
         """
 
-        # Button styling based on style type
-        if self._style == self.Style.FILLED:
-            button_style = self._get_filled_button_style(
-                current_theme, border_radius)
-        elif self._style == self.Style.OUTLINED:
-            button_style = self._get_outlined_button_style(
-                current_theme, border_radius)
-        else:  # PILL
-            button_style = self._get_pill_button_style(
-                current_theme, border_radius)
+        # Create style key for caching
+        style_key = f"{self._style}_{current_theme.current_theme}"
 
+        # Get button base style from cache or create it
+        if style_key not in self._cached_styles:
+            if self._style == self.Style.FILLED:
+                self._cached_styles[style_key] = self._get_filled_button_style(
+                    current_theme, border_radius)
+            elif self._style == self.Style.OUTLINED:
+                self._cached_styles[style_key] = self._get_outlined_button_style(
+                    current_theme, border_radius)
+            else:  # PILL
+                self._cached_styles[style_key] = self._get_pill_button_style(
+                    current_theme, border_radius)
+
+        base_button_style = self._cached_styles[style_key]
         self.setStyleSheet(container_style)
 
         # Apply styling to each button
+        total_buttons = len(self._buttons)
         for i, button in enumerate(self._buttons):
-            # Add position-specific styling for proper border handling
-            position_style = self._get_position_style(
-                i, len(self._buttons), border_radius)
-            button.setStyleSheet(button_style + position_style)
+            # Add position-specific styling only when needed
+            position_style = "" if self._style == self.Style.PILL else self._get_position_style(
+                i, total_buttons, border_radius)
+            button.setStyleSheet(base_button_style + position_style)
 
     def _get_filled_button_style(self, theme, _radius: int) -> str:
         """Get filled style button styling"""
@@ -237,6 +251,8 @@ class FluentSegmentedControl(QWidget):
 
     def _on_theme_changed(self, _theme_name: str):
         """Handle theme change"""
+        # Clear cached styles when theme changes
+        self._cached_styles.clear()
         self._apply_style()
 
     def _on_segment_clicked(self, index: int):
@@ -252,7 +268,7 @@ class FluentSegmentedControl(QWidget):
             self.segment_clicked.emit(index, self._segments[index])
 
     def add_segment(self, text: str, index: int = -1):
-        """Add a new segment"""
+        """Add a new segment efficiently"""
         if index == -1:
             index = len(self._segments)
 
@@ -265,70 +281,104 @@ class FluentSegmentedControl(QWidget):
         button.setSizePolicy(QSizePolicy.Policy.Expanding,
                              QSizePolicy.Policy.Fixed)
         button.setMinimumHeight(self._get_height())
-        button.clicked.connect(
-            lambda _checked, i=index: self._on_segment_clicked(i))
+
+        # Set index property and connect signal
+        button.setProperty("segment_index", index)
+        button.clicked.connect(self._on_segment_clicked_handler)
 
         # Insert button
         self._buttons.insert(index, button)
         self._button_group.addButton(button, index)
         self._layout.insertWidget(index, button)
 
-        # Update button group IDs for buttons after inserted one
-        for i in range(index + 1, len(self._buttons)):
-            self._button_group.setId(self._buttons[i], i)
-            # Reconnect signal with new index
-            self._buttons[i].clicked.disconnect()
-            self._buttons[i].clicked.connect(
-                lambda _checked, idx=i: self._on_segment_clicked(idx))
+        # Update button indices
+        self._update_button_indices()
 
-        # Reapply styling
-        self._apply_style()
+        # Apply style to affected buttons only
+        for i in range(index, len(self._buttons)):
+            self._apply_button_style(i)
 
         # Add reveal animation to new button
         FluentRevealEffect.slide_in(button, 200, "right")
 
+    def _update_button_indices(self):
+        """Update button indices and button group IDs efficiently"""
+        for i, button in enumerate(self._buttons):
+            button.setProperty("segment_index", i)
+            self._button_group.setId(button, i)
+
+    def _apply_button_style(self, index: int):
+        """Apply style to a specific button by index"""
+        if not (0 <= index < len(self._buttons)):
+            return
+
+        button = self._buttons[index]
+        current_theme = theme_manager
+        border_radius = self._get_border_radius()
+
+        # Get style from cache
+        style_key = f"{self._style}_{current_theme.current_theme}"
+        if style_key not in self._cached_styles:
+            if self._style == self.Style.FILLED:
+                self._cached_styles[style_key] = self._get_filled_button_style(
+                    current_theme, border_radius)
+            elif self._style == self.Style.OUTLINED:
+                self._cached_styles[style_key] = self._get_outlined_button_style(
+                    current_theme, border_radius)
+            else:  # PILL
+                self._cached_styles[style_key] = self._get_pill_button_style(
+                    current_theme, border_radius)
+
+        base_style = self._cached_styles[style_key]
+
+        # Add position styling only when needed
+        position_style = "" if self._style == self.Style.PILL else self._get_position_style(
+            index, len(self._buttons), border_radius)
+        button.setStyleSheet(base_style + position_style)
+
     def remove_segment(self, index: int):
-        """Remove a segment"""
-        if 0 <= index < len(self._segments):
-            # Remove from data
-            self._segments.pop(index)
+        """Remove a segment efficiently"""
+        if not (0 <= index < len(self._segments)):
+            return
 
-            # Remove button
-            button = self._buttons.pop(index)
-            self._button_group.removeButton(button)
-            self._layout.removeWidget(button)
+        # Remove from data
+        self._segments.pop(index)
 
-            # Add fade out animation before deletion
-            fade_out = FluentTransition.create_transition(
-                button, FluentTransition.FADE, 200, FluentTransition.EASE_SMOOTH)
-            fade_out.setStartValue(1.0)
-            fade_out.setEndValue(0.0)
-            fade_out.finished.connect(button.deleteLater)
-            fade_out.start()
+        # Remove button
+        button = self._buttons.pop(index)
+        self._button_group.removeButton(button)
+        self._layout.removeWidget(button)
 
-            # Update selection if necessary
-            if self._selected_index >= len(self._segments):
-                self._selected_index = max(0, len(self._segments) - 1)
-                if self._buttons:
-                    self._buttons[self._selected_index].setChecked(True)
-            elif index <= self._selected_index:
-                self._selected_index = max(0, self._selected_index - 1)
+        # Add fade out animation before deletion
+        fade_out = FluentTransition.create_transition(
+            button, FluentTransition.FADE, 200, FluentTransition.EASE_SMOOTH)
+        fade_out.setStartValue(1.0)
+        fade_out.setEndValue(0.0)
+        fade_out.finished.connect(button.deleteLater)
+        fade_out.start()
 
-            # Update button group IDs
-            for i in range(len(self._buttons)):
-                self._button_group.setId(self._buttons[i], i)
-                # Reconnect signal with correct index
-                self._buttons[i].clicked.disconnect()
-                self._buttons[i].clicked.connect(
-                    lambda _checked, idx=i: self._on_segment_clicked(idx))
+        # Update selection if necessary
+        if self._selected_index >= len(self._segments):
+            self._selected_index = max(0, len(self._segments) - 1)
+            if self._buttons and self._selected_index >= 0:
+                self._buttons[self._selected_index].setChecked(True)
+        elif index <= self._selected_index:
+            self._selected_index = max(0, self._selected_index - 1)
+            if self._buttons and self._selected_index >= 0:
+                self._buttons[self._selected_index].setChecked(True)
 
-            # Reapply styling
-            self._apply_style()
+        # Update button indices
+        self._update_button_indices()
+
+        # Only update styles for buttons whose positions changed
+        for i in range(index, len(self._buttons)):
+            self._apply_button_style(i)
 
     def set_selected_index(self, index: int):
         """Set the selected segment index"""
         if 0 <= index < len(self._buttons):
-            self._buttons[self._selected_index].setChecked(False)
+            if 0 <= self._selected_index < len(self._buttons):
+                self._buttons[self._selected_index].setChecked(False)
             self._selected_index = index
             self._buttons[index].setChecked(True)
 
@@ -371,6 +421,7 @@ class FluentTabBar(FluentSegmentedControl):
                  tabs: Optional[List[str]] = None,
                  closable_tabs: bool = False):
         self._closable_tabs = closable_tabs
+        self._close_buttons = []  # Track close buttons separately
         super().__init__(parent, tabs or [], self.Size.MEDIUM, self.Style.FILLED)
 
         # Override signals for tab-specific naming
@@ -384,30 +435,37 @@ class FluentTabBar(FluentSegmentedControl):
             self._add_close_buttons()
 
     def _add_close_buttons(self):
-        """Add close buttons to tabs"""
+        """Add close buttons to tabs efficiently"""
         for i, button in enumerate(self._buttons):
-            # Create a container for button + close button
-            container = QWidget()
-            layout = QHBoxLayout(container)
-            layout.setContentsMargins(0, 0, 4, 0)
-            layout.setSpacing(4)
+            # Store original text and clear button text
+            button_text = button.text()
+            button.setText("")
 
-            # Move button text to a label
-            text_label = QLabel(button.text())
+            # Create container layout within button for better performance
+            container_layout = QHBoxLayout(button)
+            container_layout.setContentsMargins(6, 2, 6, 2)
+            container_layout.setSpacing(4)
+
+            # Text label
+            text_label = QLabel(button_text)
             text_label.setFont(button.font())
 
-            # Create close button
+            # Close button with stored index property
             close_btn = QPushButton("×")
             close_btn.setFixedSize(16, 16)
-            close_btn.clicked.connect(
-                lambda _checked, index=i: self._on_tab_close(index))
+            close_btn.setProperty("tab_index", i)
+            close_btn.clicked.connect(self._on_tab_close_handler)
+            self._close_buttons.append(close_btn)
 
-            layout.addWidget(text_label)
-            layout.addWidget(close_btn)
+            container_layout.addWidget(text_label, 1)  # 1 = stretch factor
+            container_layout.addWidget(close_btn, 0)   # 0 = no stretch
 
-            # Replace button content (this is a simplified approach)
-            button.setText("")
-            # In a real implementation, you'd need to handle this more carefully
+    def _on_tab_close_handler(self):
+        """Handle tab close click using sender property"""
+        sender = self.sender()
+        if sender:
+            index = sender.property("tab_index")
+            self._on_tab_close(index)
 
     def _on_tab_close(self, index: int):
         """Handle tab close request"""
@@ -419,13 +477,54 @@ class FluentTabBar(FluentSegmentedControl):
             # Emit close request signal
             self.tab_close_requested.emit(index)
 
+    def _update_button_indices(self):
+        """Override to update both button and close button indices"""
+        super()._update_button_indices()
+
+        # Update close button indices
+        for i, close_btn in enumerate(self._close_buttons):
+            close_btn.setProperty("tab_index", i)
+
     def add_tab(self, text: str, index: int = -1):
-        """Add a new tab"""
-        self.add_segment(text, index)
+        """Add a new tab with close button if needed"""
+        super().add_segment(text, index)
+
+        # If tabs are closable, add close button to the new tab
+        if self._closable_tabs:
+            if index == -1:
+                index = len(self._buttons) - 1
+
+            button = self._buttons[index]
+            button_text = button.text()
+            button.setText("")
+
+            container_layout = QHBoxLayout(button)
+            container_layout.setContentsMargins(6, 2, 6, 2)
+            container_layout.setSpacing(4)
+
+            text_label = QLabel(button_text)
+            text_label.setFont(button.font())
+
+            close_btn = QPushButton("×")
+            close_btn.setFixedSize(16, 16)
+            close_btn.setProperty("tab_index", index)
+            close_btn.clicked.connect(self._on_tab_close_handler)
+
+            # Insert close button at correct position
+            self._close_buttons.insert(index, close_btn)
+
+            container_layout.addWidget(text_label, 1)
+            container_layout.addWidget(close_btn, 0)
+
+            # Update all indices
+            self._update_button_indices()
 
     def remove_tab(self, index: int):
-        """Remove a tab"""
-        self.remove_segment(index)
+        """Remove a tab and its close button if present"""
+        if self._closable_tabs and 0 <= index < len(self._close_buttons):
+            self._close_buttons.pop(index)
+
+        super().remove_segment(index)
 
     def set_current_tab(self, index: int):
         """Set the current tab"""
@@ -453,6 +552,7 @@ class FluentToggleGroup(QWidget):
         self._size = size
         self._buttons: List[QPushButton] = []
         self._selected_indices: List[int] = []
+        self._button_style_cache = None  # Style cache for performance
 
         self._setup_ui()
         self._apply_style()
@@ -464,7 +564,7 @@ class FluentToggleGroup(QWidget):
         FluentRevealEffect.fade_in(self, 300)
 
     def _setup_ui(self):
-        """Setup toggle group UI"""
+        """Setup toggle group UI with property-based signal handling"""
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(4, 4, 4, 4)
         self._layout.setSpacing(8)
@@ -474,11 +574,20 @@ class FluentToggleGroup(QWidget):
             button.setCheckable(True)
             button.setFont(self._get_font())
             button.setMinimumHeight(self._get_height())
-            button.clicked.connect(
-                lambda checked, index=i: self._on_toggle_clicked(index, checked))
+
+            # Store index in button property
+            button.setProperty("toggle_index", i)
+            button.clicked.connect(self._on_toggle_clicked_handler)
 
             self._buttons.append(button)
             self._layout.addWidget(button)
+
+    def _on_toggle_clicked_handler(self, checked):
+        """Handler that uses sender properties to identify source button"""
+        sender = self.sender()
+        if sender:
+            index = sender.property("toggle_index")
+            self._on_toggle_clicked(index, checked)
 
     def _get_font(self) -> QFont:
         """Get font based on size"""
@@ -499,44 +608,48 @@ class FluentToggleGroup(QWidget):
             return 32
 
     def _apply_style(self):
-        """Apply toggle group styling"""
+        """Apply toggle group styling with caching for better performance"""
         current_theme = theme_manager
 
-        button_style = f"""
-            QPushButton {{
-                background-color: {current_theme.get_color('surface').name()};
-                border: 1px solid {current_theme.get_color('border').name()};
-                border-radius: 6px;
-                color: {current_theme.get_color('text_primary').name()};
-                padding: 6px 16px;
-                font-weight: 500;
-            }}
-            QPushButton:hover {{
-                background-color: {current_theme.get_color('surface_light').name()};
-                border-color: {current_theme.get_color('primary').lighter(120).name()};
-            }}
-            QPushButton:checked {{
-                background-color: {current_theme.get_color('primary').name()};
-                border-color: {current_theme.get_color('primary').name()};
-                color: {current_theme.get_color('text_on_accent').name()};
-            }}
-            QPushButton:checked:hover {{
-                background-color: {current_theme.get_color('primary').lighter(110).name()};
-            }}
-        """
+        # Use cached style if available, otherwise generate it
+        if self._button_style_cache is None:
+            self._button_style_cache = f"""
+                QPushButton {{
+                    background-color: {current_theme.get_color('surface').name()};
+                    border: 1px solid {current_theme.get_color('border').name()};
+                    border-radius: 6px;
+                    color: {current_theme.get_color('text_primary').name()};
+                    padding: 6px 16px;
+                    font-weight: 500;
+                }}
+                QPushButton:hover {{
+                    background-color: {current_theme.get_color('surface_light').name()};
+                    border-color: {current_theme.get_color('primary').lighter(120).name()};
+                }}
+                QPushButton:checked {{
+                    background-color: {current_theme.get_color('primary').name()};
+                    border-color: {current_theme.get_color('primary').name()};
+                    color: {current_theme.get_color('text_on_accent').name()};
+                }}
+                QPushButton:checked:hover {{
+                    background-color: {current_theme.get_color('primary').lighter(110).name()};
+                }}
+            """
 
+        # Apply cached style to all buttons
         for button in self._buttons:
-            button.setStyleSheet(button_style)
+            button.setStyleSheet(self._button_style_cache)
 
     def _on_theme_changed(self, _theme_name: str):
-        """Handle theme change"""
+        """Handle theme change by invalidating cache"""
+        self._button_style_cache = None
         self._apply_style()
 
     def _on_toggle_clicked(self, index: int, checked: bool):
-        """Handle toggle button click"""
+        """Handle toggle button click with optimized selection logic"""
         if checked:
             if not self._multi_select:
-                # Single select mode - uncheck all others
+                # Single select mode - uncheck all others efficiently
                 for i, button in enumerate(self._buttons):
                     if i != index and button.isChecked():
                         button.setChecked(False)
@@ -552,11 +665,14 @@ class FluentToggleGroup(QWidget):
             if index in self._selected_indices:
                 self._selected_indices.remove(index)
 
+        # Sort indices for consistent ordering
+        self._selected_indices.sort()
+
         self.toggle_changed.emit(index, checked)
         self.selection_changed.emit(self._selected_indices.copy())
 
     def set_selected_indices(self, indices: List[int]):
-        """Set selected indices"""
+        """Set selected indices efficiently"""
         # Clear current selection
         for button in self._buttons:
             button.setChecked(False)
@@ -570,6 +686,9 @@ class FluentToggleGroup(QWidget):
 
                 self._buttons[index].setChecked(True)
                 self._selected_indices.append(index)
+
+        # Sort indices for consistent ordering
+        self._selected_indices.sort()
 
     def get_selected_indices(self) -> List[int]:
         """Get selected indices"""
