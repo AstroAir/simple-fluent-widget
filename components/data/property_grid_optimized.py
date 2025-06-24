@@ -51,10 +51,9 @@ except ImportError:
     # Modern null object pattern with proper typing
     class AnimationProxy:
         """Null object pattern for missing animation classes"""
-
         def __getattr__(self, name: str) -> Callable[..., None]:
             return lambda *args, **kwargs: None
-
+    
     ANIMATIONS_AVAILABLE = False
     FluentRevealEffect = AnimationProxy()
     FluentMicroInteraction = AnimationProxy()
@@ -73,7 +72,6 @@ P = TypeVar('P', bound='FluentPropertyItem')
 
 class PropertyValidationProtocol(Protocol):
     """Protocol for property validation functions"""
-
     def __call__(self, value: Any) -> bool: ...
 
 
@@ -90,7 +88,7 @@ class PropertyConstraints:
 class PropertyType(Enum):
     """Enhanced property data types with auto() for maintainability"""
     STRING = auto()
-    INTEGER = auto()
+    INTEGER = auto() 
     FLOAT = auto()
     BOOLEAN = auto()
     COLOR = auto()
@@ -111,7 +109,7 @@ class PropertyType(Enum):
 @dataclass(slots=True)  # Modern dataclass with __slots__ optimization
 class FluentPropertyItem:
     """Represents a single property item with enhanced validation and constraints"""
-
+    
     name: str
     value: PropertyValue
     property_type: PropertyType
@@ -123,12 +121,12 @@ class FluentPropertyItem:
     category: str = "General"
     constraints: Optional[PropertyConstraints] = None
     validator: Optional[PropertyValidationProtocol] = None
-
+    
     def __post_init__(self) -> None:
         """Post-initialization validation and setup"""
         if self.choices is not None and not isinstance(self.choices, (list, tuple)):
             object.__setattr__(self, 'choices', list(self.choices))
-
+        
         # Auto-create constraints if not provided
         if self.constraints is None and self.property_type in (PropertyType.INTEGER, PropertyType.FLOAT):
             object.__setattr__(self, 'constraints', PropertyConstraints(
@@ -145,14 +143,13 @@ class FluentPropertyItem:
         # Custom validator takes precedence
         if self.validator and not self.validator(value):
             return False
-
+            
         # Built-in constraint validation using match statement
         if self.constraints:
             match self.property_type:
                 case PropertyType.INTEGER | PropertyType.FLOAT:
                     try:
-                        num_val = float(value) if isinstance(
-                            value, (str, int, float)) else 0.0
+                        num_val = float(value) if isinstance(value, (str, int, float)) else 0.0
                         if self.constraints.min_value is not None and num_val < self.constraints.min_value:
                             return False
                         if self.constraints.max_value is not None and num_val > self.constraints.max_value:
@@ -165,14 +162,14 @@ class FluentPropertyItem:
                 case PropertyType.CHOICE:
                     if self.constraints.choices and str(value) not in self.constraints.choices:
                         return False
-
+        
         return True
 
 
 class FluentPropertyGrid(QWidget):
     """
     Advanced property grid for editing object properties with modern features
-
+    
     Enhanced with:
     - Type-safe property handling
     - Async property updates 
@@ -183,18 +180,17 @@ class FluentPropertyGrid(QWidget):
 
     # Enhanced signals with proper typing
     property_changed = Signal(str, object)  # property_name, new_value
-    property_validation_failed = Signal(
-        str, object, str)  # property_name, value, error
+    property_validation_failed = Signal(str, object, str)  # property_name, value, error
     selection_changed = Signal(str)  # property_name
-
+    
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-
+        
         # Enhanced initialization with type hints
         self.properties: Dict[str, FluentPropertyItem] = {}
         self.editors: Dict[str, QWidget] = {}
         self.categories: Dict[str, QTreeWidgetItem] = {}
-
+        
         # Performance and animation settings
         self.animations_enabled = True
         self.animation_duration = 250  # Reduced for better performance
@@ -202,12 +198,12 @@ class FluentPropertyGrid(QWidget):
         self._update_timer.setSingleShot(True)
         self._update_timer.timeout.connect(self._perform_deferred_updates)
         self._pending_updates: List[str] = []
-
+        
         # Undo/redo support
         self._property_history: List[Dict[str, PropertyValue]] = []
         self._history_index = -1
         self._max_history = 50
-
+        
         self.setup_ui()
         self.setup_shortcuts()
         self.apply_theme()
@@ -225,15 +221,13 @@ class FluentPropertyGrid(QWidget):
         self.tree.setAlternatingRowColors(True)
         self.tree.setRootIsDecorated(True)
         self.tree.setItemsExpandable(True)
-        self.tree.setSelectionBehavior(
-            QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tree.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tree.setUniformRowHeights(True)  # Performance optimization
-
+        
         # Accessibility improvements
         self.tree.setAccessibleName("Property Grid")
-        self.tree.setAccessibleDescription(
-            "Edit properties by selecting items and modifying values")
-
+        self.tree.setAccessibleDescription("Edit properties by selecting items and modifying values")
+        
         # Enhanced header configuration
         header = self.tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -253,20 +247,17 @@ class FluentPropertyGrid(QWidget):
         """Setup keyboard shortcuts for accessibility and productivity"""
         try:
             # Undo/Redo shortcuts with proper QKeySequence creation
-            undo_shortcut = QShortcut(QKeySequence(
-                QKeySequence.StandardKey.Undo), self)
+            undo_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Undo), self)
             undo_shortcut.activated.connect(self.undo_last_change)
-
-            redo_shortcut = QShortcut(QKeySequence(
-                QKeySequence.StandardKey.Redo), self)
+            
+            redo_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Redo), self)
             redo_shortcut.activated.connect(self.redo_last_change)
-
+            
             # Navigation shortcuts
             expand_all_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
             expand_all_shortcut.activated.connect(self.tree.expandAll)
-
-            collapse_all_shortcut = QShortcut(
-                QKeySequence("Ctrl+Shift+E"), self)
+            
+            collapse_all_shortcut = QShortcut(QKeySequence("Ctrl+Shift+E"), self)
             collapse_all_shortcut.activated.connect(self.tree.collapseAll)
         except Exception as e:
             print(f"Warning: Could not setup shortcuts: {e}")
@@ -294,21 +285,21 @@ class FluentPropertyGrid(QWidget):
         """Perform pending updates in batch for better performance"""
         if not self._pending_updates:
             return
-
+            
         for prop_name in self._pending_updates:
             if prop_name in self.properties:
                 self._update_property_display(prop_name)
-
+        
         self._pending_updates.clear()
 
     def _update_property_display(self, prop_name: str) -> None:
         """Update the display for a specific property"""
         if prop_name not in self.editors:
             return
-
+            
         prop = self.properties[prop_name]
         editor = self.editors[prop_name]
-
+        
         # Type-safe value updates
         self._safe_update_editor_value(editor, prop)
 
@@ -348,16 +339,15 @@ class FluentPropertyGrid(QWidget):
 
     def _save_state(self) -> None:
         """Save current property state for undo/redo"""
-        current_state = {name: prop.value for name,
-                         prop in self.properties.items()}
-
+        current_state = {name: prop.value for name, prop in self.properties.items()}
+        
         # Remove future history if we're not at the end
         if self._history_index < len(self._property_history) - 1:
             self._property_history = self._property_history[:self._history_index + 1]
-
+        
         self._property_history.append(current_state)
         self._history_index = len(self._property_history) - 1
-
+        
         # Limit history size
         if len(self._property_history) > self._max_history:
             self._property_history.pop(0)
@@ -390,7 +380,7 @@ class FluentPropertyGrid(QWidget):
             bg_color = theme_manager.get_color('surface').name()
             text_color = theme_manager.get_color('on_surface').name()
             border_color = theme_manager.get_color('outline').name()
-
+            
             modern_style = f"""
                 QTreeWidget {{
                     background-color: {bg_color};
@@ -418,9 +408,9 @@ class FluentPropertyGrid(QWidget):
                     color: {theme_manager.get_color('on_primary_container').name()};
                 }}
             """
-
+            
             self.setStyleSheet(modern_style)
-
+            
         except Exception as e:
             print(f"Warning: Could not apply theme: {e}")
 
@@ -428,7 +418,7 @@ class FluentPropertyGrid(QWidget):
         """Add a property to the grid with enhanced features"""
         # Save state before modification
         self._save_state()
-
+        
         self.properties[prop.name] = prop
 
         # Find or create category with modern styling
@@ -437,8 +427,7 @@ class FluentPropertyGrid(QWidget):
             category_item = QTreeWidgetItem(self.tree)
             category_item.setText(0, prop.category)
             category_item.setExpanded(True)
-            category_item.setFlags(category_item.flags()
-                                   & ~Qt.ItemFlag.ItemIsSelectable)
+            category_item.setFlags(category_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
 
             # Enhanced category styling
             font = category_item.font(0)
@@ -452,7 +441,7 @@ class FluentPropertyGrid(QWidget):
         prop_item = QTreeWidgetItem(category_item)
         prop_item.setText(0, prop.name)
         prop_item.setToolTip(0, prop.description)
-
+        
         # Add validation indicator
         if prop.constraints and prop.constraints.required:
             prop_item.setText(0, f"{prop.name} *")  # Mark required fields
@@ -471,12 +460,11 @@ class FluentPropertyGrid(QWidget):
         """Create appropriate editor widget with enhanced type safety"""
         if prop.readonly:
             editor = QLabel(str(prop.value))
-            editor.setAlignment(Qt.AlignmentFlag.AlignLeft |
-                                Qt.AlignmentFlag.AlignVCenter)
+            editor.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             return editor
 
         editor_widget: Optional[QWidget] = None
-
+        
         try:
             match prop.property_type:
                 case PropertyType.STRING:
@@ -521,7 +509,7 @@ class FluentPropertyGrid(QWidget):
                     editor.currentTextChanged.connect(
                         lambda text, p_name=prop.name: self._handle_property_change(p_name, text))
                     editor_widget = editor
-
+                    
                 case _:  # Default fallback
                     editor = QLineEdit()
                     editor.setText(str(prop.value))
@@ -537,28 +525,27 @@ class FluentPropertyGrid(QWidget):
         # Apply modern styling
         if editor_widget and THEME_AVAILABLE and theme_manager:
             self._apply_editor_theme(editor_widget)
-
+            
         return editor_widget
 
     def _handle_property_change(self, prop_name: str, value: PropertyValue) -> None:
         """Handle property changes with validation and history"""
         if prop_name not in self.properties:
             return
-
+            
         prop = self.properties[prop_name]
-
+        
         # Validate the new value
         if not prop.is_valid(value):
-            self.property_validation_failed.emit(
-                prop_name, value, "Invalid value")
+            self.property_validation_failed.emit(prop_name, value, "Invalid value")
             return
-
+            
         # Update property value
         object.__setattr__(prop, 'value', value)
-
+        
         # Emit change signal
         self.property_changed.emit(prop_name, value)
-
+        
         # Add micro-interaction feedback
         if ANIMATIONS_AVAILABLE and self.animations_enabled:
             editor = self.editors.get(prop_name)
@@ -591,12 +578,11 @@ class FluentPropertyGrid(QWidget):
         """Animate property reveal with fallback"""
         if not self.animations_enabled or not ANIMATIONS_AVAILABLE:
             return
-
+            
         try:
             widget = self.tree.itemWidget(item, 1)
             if widget:
-                FluentRevealEffect.fade_in(
-                    widget, duration=self.animation_duration // 2)
+                FluentRevealEffect.fade_in(widget, duration=self.animation_duration // 2)
         except Exception:
             pass  # Silent fallback
 
@@ -604,7 +590,7 @@ class FluentPropertyGrid(QWidget):
         """Animate category expansion with staggered effects"""
         if not self.animations_enabled or not ANIMATIONS_AVAILABLE:
             return
-
+            
         try:
             if item in self.categories.values():
                 for i in range(item.childCount()):
@@ -612,7 +598,7 @@ class FluentPropertyGrid(QWidget):
                     widget = self.tree.itemWidget(child_item, 1)
                     if widget:
                         QTimer.singleShot(i * 50, lambda w=widget:
-                                          FluentRevealEffect.slide_in(w, duration=self.animation_duration, direction="up"))
+                                        FluentRevealEffect.slide_in(w, duration=self.animation_duration, direction="up"))
         except Exception:
             pass
 
@@ -620,7 +606,7 @@ class FluentPropertyGrid(QWidget):
         """Animate category collapse"""
         if not self.animations_enabled or not ANIMATIONS_AVAILABLE:
             return
-
+            
         try:
             if item in self.categories.values():
                 for i in range(item.childCount()):
@@ -629,14 +615,12 @@ class FluentPropertyGrid(QWidget):
                     if widget:
                         effect = QGraphicsOpacityEffect(widget)
                         widget.setGraphicsEffect(effect)
-
-                        anim = QPropertyAnimation(
-                            effect, QByteArray(b"opacity"))
+                        
+                        anim = QPropertyAnimation(effect, QByteArray(b"opacity"))
                         anim.setDuration(self.animation_duration // 2)
                         anim.setStartValue(1.0)
                         anim.setEndValue(0.0)
-                        anim.start(
-                            QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+                        anim.start(QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
         except Exception:
             pass
 
@@ -647,7 +631,6 @@ class FluentPropertyGrid(QWidget):
                 FluentMicroInteraction.pulse_animation(widget, scale=1.03)
             except Exception:
                 pass    # Modern utility methods
-
     def get_property_value(self, name: str) -> Optional[PropertyValue]:
         """Get current property value with type safety"""
         prop = self.properties.get(name)
@@ -657,11 +640,11 @@ class FluentPropertyGrid(QWidget):
         """Set property value with validation"""
         if name not in self.properties:
             return False
-
+            
         prop = self.properties[name]
         if not prop.is_valid(value):
             return False
-
+            
         object.__setattr__(prop, 'value', value)
         self._update_property_display(name)
         return True
@@ -686,7 +669,7 @@ class FluentPropertyGrid(QWidget):
     def import_properties(self, values: Dict[str, PropertyValue]) -> None:
         """Import property values with validation"""
         self._save_state()
-
+        
         for name, value in values.items():
             if name in self.properties:
                 self.set_property_value(name, value)
@@ -695,43 +678,43 @@ class FluentPropertyGrid(QWidget):
 # Example usage and demo
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication, QMainWindow
-
+    
     app = QApplication(sys.argv)
-
+    
     # Create main window
     window = QMainWindow()
     window.setWindowTitle("Enhanced Property Grid Demo")
     window.setGeometry(100, 100, 800, 600)
-
+    
     # Create property grid
     prop_grid = FluentPropertyGrid()
-
+    
     # Add sample properties with modern features
     prop_grid.add_property(FluentPropertyItem(
-        "Name", "John Doe", PropertyType.STRING,
+        "Name", "John Doe", PropertyType.STRING, 
         "Person's full name", category="Personal Info",
         constraints=PropertyConstraints(required=True)
     ))
-
+    
     prop_grid.add_property(FluentPropertyItem(
-        "Age", 30, PropertyType.INTEGER,
+        "Age", 30, PropertyType.INTEGER, 
         "Person's age in years", category="Personal Info",
         constraints=PropertyConstraints(min_value=0, max_value=150)
     ))
-
+    
     prop_grid.add_property(FluentPropertyItem(
-        "Active", True, PropertyType.BOOLEAN,
+        "Active", True, PropertyType.BOOLEAN, 
         "Is the person active", category="Status"
     ))
-
+    
     prop_grid.add_property(FluentPropertyItem(
-        "Country", "USA", PropertyType.CHOICE,
-        "Country of residence",
+        "Country", "USA", PropertyType.CHOICE, 
+        "Country of residence", 
         choices=("USA", "Canada", "UK", "Germany", "France"),
         category="Location"
     ))
-
+    
     window.setCentralWidget(prop_grid)
     window.show()
-
+    
     sys.exit(app.exec())

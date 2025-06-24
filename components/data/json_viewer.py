@@ -1,683 +1,447 @@
-"""
+﻿"""
 JSON Viewer Components
 
 Advanced JSON viewing and editing components that follow the Fluent Design System.
-Includes syntax highlighting, tree view, and validation.
+Includes syntax highlighting, tree view, and validation with modern Python features.
 """
 
 import sys
 import json
 import re
-from typing import Any, Dict, List, Union
+from dataclasses import dataclass, field
+from enum import Enum, auto
+from typing import Any, Dict, List, Union, Optional, Protocol, TypeAlias, Final
+from functools import cached_property, lru_cache
+from contextlib import contextmanager
+from weakref import WeakSet
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
                                QTreeWidget, QTreeWidgetItem,
                                QPushButton, QLabel, QLineEdit,
-                               QHeaderView, QTabWidget)
-from PySide6.QtCore import Qt, Signal, QTimer
+                               QHeaderView, QTabWidget, QApplication)
+from PySide6.QtCore import Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve, Property
 from PySide6.QtGui import (QFont, QColor, QSyntaxHighlighter,
-                           QTextDocument, QTextCharFormat)
+                           QTextDocument, QTextCharFormat, QAction)
 
-# Import theme manager
-try:
-    from core.theme import theme_manager
-except ImportError:
-    theme_manager = None
+# Import enhanced components
+from core.theme import theme_manager, ThemeMode
+from core.enhanced_base import FluentLayoutBuilder, FluentStandardButton
 
 
-class JsonSyntaxHighlighter(QSyntaxHighlighter):
-    """JSON syntax highlighter"""
+# Type aliases for better readability
+JsonData: TypeAlias = Union[Dict[str, Any],
+                            List[Any], str, int, float, bool, None]
+JsonPath: TypeAlias = str
 
-    def __init__(self, document: QTextDocument):
+
+class JsonHighlightRule(Enum):
+    """JSON syntax highlighting rules"""
+    STRING = auto()
+    NUMBER = auto()
+    KEYWORD = auto()
+    KEY = auto()
+    BRACE = auto()
+    OPERATOR = auto()
+
+
+@dataclass(frozen=True)
+class JsonSyntaxConfig:
+    """Configuration for JSON syntax highlighting"""
+    string_color: str = "#0969da"
+    number_color: str = "#cf222e"
+    keyword_color: str = "#8250df"
+    key_color: str = "#8250df"
+    brace_color: str = "#656d76"
+    operator_color: str = "#656d76"
+
+    def get_color(self, rule: JsonHighlightRule) -> str:
+        """Get color for a highlighting rule"""
+        return {
+            JsonHighlightRule.STRING: self.string_color,
+            JsonHighlightRule.NUMBER: self.number_color,
+            JsonHighlightRule.KEYWORD: self.keyword_color,
+            JsonHighlightRule.KEY: self.key_color,
+            JsonHighlightRule.BRACE: self.brace_color,
+            JsonHighlightRule.OPERATOR: self.operator_color,
+        }[rule]
+
+
+@dataclass
+class JsonTreeConfig:
+    """Configuration for JSON tree widget"""
+    max_value_length: int = 100
+    auto_expand_depth: int = 2
+    enable_alternating_colors: bool = True
+    show_type_column: bool = True
+
+
+@dataclass
+class ValidationState:
+    """JSON validation state"""
+    is_valid: bool = True
+    error_message: str = ""
+    line_number: Optional[int] = None
+    column_number: Optional[int] = None
+
+
+class JsonViewerTheme(Protocol):
+    """Protocol for theme management in JSON viewer"""
+
+    def get_color(self, name: str) -> QColor: ...
+    def theme_changed(self) -> Signal: ...
+
+
+class OptimizedJsonSyntaxHighlighter(QSyntaxHighlighter):
+    """Optimized JSON syntax highlighter with caching and modern features"""
+
+    # Compiled regex patterns for better performance
+    _patterns: Final[Dict[JsonHighlightRule, re.Pattern]] = {
+        JsonHighlightRule.STRING: re.compile(r'"[^"\\]*(\\.[^"\\]*)*"'),
+        JsonHighlightRule.NUMBER: re.compile(r'-?\d+\.?\d*([eE][+-]?\d+)?'),
+        JsonHighlightRule.KEYWORD: re.compile(r'\b(true|false|null)\b'),
+        JsonHighlightRule.BRACE: re.compile(r'[{}[\],:]'),
+    }
+
+    def __init__(self, document: QTextDocument, theme: Optional[JsonViewerTheme] = None):
         super().__init__(document)
-        self.setup_highlighting_rules()
+        self._theme = theme or theme_manager
+        self._config = JsonSyntaxConfig()
+        self._formats: Dict[JsonHighlightRule, QTextCharFormat] = {}
+        self._setup_highlighting_rules()
 
-    def setup_highlighting_rules(self):
-        """Setup syntax highlighting rules"""
-        # Get colors from theme
-        if theme_manager:
-            string_color = theme_manager.get_color('primary')
-            number_color = theme_manager.get_color('secondary')
-            keyword_color = theme_manager.get_color('tertiary')
-            comment_color = theme_manager.get_color('outline')
-        else:
-            string_color = "#0969da"  # Blue
-            number_color = "#cf222e"  # Red
-            keyword_color = "#8250df"  # Purple
-            comment_color = "#656d76"  # Gray
+        # Cache for string positions to avoid repeated computation
+        self._string_positions_cache: Dict[str, List[tuple[int, int]]] = {}
 
-        # String format
-        self.string_format = QTextCharFormat()
-        self.string_format.setForeground(QColor(string_color))
+    def _setup_highlighting_rules(self):
+        """Setup syntax highlighting rules with theme integration"""
+        if hasattr(self._theme, 'get_color'):
+            try:
+                # Use theme colors if available
+                self._config = JsonSyntaxConfig(
+                    string_color=self._theme.get_color('primary').name(),
+                    number_color=self._theme.get_color('secondary').name(),
+                    keyword_color=self._theme.get_color('tertiary').name(),
+                    key_color=self._theme.get_color('tertiary').name(),
+                    brace_color=self._theme.get_color('outline').name(),
+                    operator_color=self._theme.get_color('outline').name(),
+                )
+            except (AttributeError, KeyError):
+                # Fall back to default colors
+                pass
 
-        # Number format
-        self.number_format = QTextCharFormat()
-        self.number_format.setForeground(QColor(number_color))
+        # Create text formats
+        for rule in JsonHighlightRule:
+            fmt = QTextCharFormat()
+            color = self._config.get_color(rule)
+            fmt.setForeground(QColor(color))
 
-        # Keyword format (true, false, null)
-        self.keyword_format = QTextCharFormat()
-        self.keyword_format.setForeground(QColor(keyword_color))
-        self.keyword_format.setFontWeight(QFont.Weight.Bold)
+            if rule in (JsonHighlightRule.KEYWORD, JsonHighlightRule.BRACE):
+                fmt.setFontWeight(QFont.Weight.Bold)
 
-        # Key format
-        self.key_format = QTextCharFormat()
-        self.key_format.setForeground(QColor(keyword_color))
+            self._formats[rule] = fmt
 
-        # Brace format
-        self.brace_format = QTextCharFormat()
-        self.brace_format.setForeground(QColor(comment_color))
-        self.brace_format.setFontWeight(QFont.Weight.Bold)
+    @lru_cache(maxsize=128)
+    def _find_string_positions(self, text: str) -> tuple[tuple[int, int], ...]:
+        """Find string positions with caching"""
+        positions = []
+        for match in self._patterns[JsonHighlightRule.STRING].finditer(text):
+            positions.append(match.span())
+        return tuple(positions)
+
+    def _is_in_string(self, text: str, position: int) -> bool:
+        """Optimized check if position is inside a string"""
+        string_positions = self._find_string_positions(text)
+        return any(start < position < end for start, end in string_positions)
 
     def highlightBlock(self, text: str):
-        """Highlight a block of text"""
-        # Highlight strings
-        string_pattern = r'"[^"\\]*(\\.[^"\\]*)*"'
-        for match in re.finditer(string_pattern, text):
-            start, end = match.span()
+        """Highlight a block of text with optimization"""
+        if not text.strip():
+            return
+
+        # Highlight strings first and determine if they are keys
+        string_positions = self._find_string_positions(text)
+        for start, end in string_positions:
             # Check if this is a key (followed by :)
             remaining_text = text[end:].strip()
-            if remaining_text.startswith(':'):
-                self.setFormat(start, end - start, self.key_format)
-            else:
-                self.setFormat(start, end - start, self.string_format)
+            rule = JsonHighlightRule.KEY if remaining_text.startswith(
+                ':') else JsonHighlightRule.STRING
+            self.setFormat(start, end - start, self._formats[rule])
 
-        # Highlight numbers
-        number_pattern = r'-?\d+\.?\d*([eE][+-]?\d+)?'
-        for match in re.finditer(number_pattern, text):
+        # Highlight numbers (avoid strings)
+        for match in self._patterns[JsonHighlightRule.NUMBER].finditer(text):
             start, end = match.span()
-            # Make sure it's not part of a string
-            if not self.is_in_string(text, start):
-                self.setFormat(start, end - start, self.number_format)
+            if not self._is_in_string(text, start):
+                self.setFormat(start, end - start,
+                               self._formats[JsonHighlightRule.NUMBER])
 
-        # Highlight keywords
-        keyword_pattern = r'\b(true|false|null)\b'
-        for match in re.finditer(keyword_pattern, text):
+        # Highlight keywords (avoid strings)
+        for match in self._patterns[JsonHighlightRule.KEYWORD].finditer(text):
             start, end = match.span()
-            if not self.is_in_string(text, start):
-                self.setFormat(start, end - start, self.keyword_format)
+            if not self._is_in_string(text, start):
+                self.setFormat(start, end - start,
+                               self._formats[JsonHighlightRule.KEYWORD])
 
-        # Highlight braces and brackets
-        brace_pattern = r'[{}[\],]'
-        for match in re.finditer(brace_pattern, text):
+        # Highlight braces and operators (avoid strings)
+        for match in self._patterns[JsonHighlightRule.BRACE].finditer(text):
             start, end = match.span()
-            if not self.is_in_string(text, start):
-                self.setFormat(start, end - start, self.brace_format)
+            if not self._is_in_string(text, start):
+                self.setFormat(start, end - start,
+                               self._formats[JsonHighlightRule.BRACE])
 
-    def is_in_string(self, text: str, position: int) -> bool:
-        """Check if position is inside a string"""
-        string_starts = []
-        string_ends = []
-
-        # Find all string start and end positions
-        for match in re.finditer(r'"', text):
-            pos = match.start()
-            # Check if it's escaped
-            escaped = False
-            escape_count = 0
-            for i in range(pos - 1, -1, -1):
-                if text[i] == '\\':
-                    escape_count += 1
-                else:
-                    break
-            escaped = escape_count % 2 == 1
-
-            if not escaped:
-                if len(string_starts) == len(string_ends):
-                    string_starts.append(pos)
-                else:
-                    string_ends.append(pos)
-
-        # Check if position is between any string start/end pair
-        for i, start in enumerate(string_starts):
-            if i < len(string_ends):
-                end = string_ends[i]
-                if start < position < end:
-                    return True
-
-        return False
+    def update_theme(self):
+        """Update highlighting when theme changes"""
+        self._setup_highlighting_rules()
+        self._string_positions_cache.clear()
+        self.rehighlight()
 
 
-class FluentJsonTreeWidget(QTreeWidget):
-    """JSON tree view widget"""
+# Backward compatibility aliases
+JsonSyntaxHighlighter = OptimizedJsonSyntaxHighlighter
+
+
+class OptimizedJsonTreeWidget(QTreeWidget):
+    """Optimized JSON tree view widget with modern features"""
 
     item_selected = Signal(str, object)  # path, value
+    item_double_clicked = Signal(str, object)  # path, value
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.json_data = None
+        self._config = JsonTreeConfig()
+        self._json_data: Optional[JsonData] = None
+        self._setup_ui()
+        self._setup_connections()
 
-        self.setup_ui()
-        self.apply_theme()
+    def _setup_ui(self):
+        """Setup the tree widget UI"""
+        headers = ["Key", "Value"]
+        if self._config.show_type_column:
+            headers.append("Type")
 
-        # Connect to theme changes
-        if theme_manager:
-            theme_manager.theme_changed.connect(self.apply_theme)
-
-    def setup_ui(self):
-        """Setup the user interface"""
-        self.setHeaderLabels(["Key", "Value", "Type"])
-        self.setAlternatingRowColors(True)
-        self.setRootIsDecorated(True)
+        self.setHeaderLabels(headers)
+        self.setAlternatingRowColors(self._config.enable_alternating_colors)
+        self.setExpandsOnDoubleClick(False)
+        self.setSortingEnabled(True)
 
         # Configure header
         header = self.header()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
-        # Connect selection signal
-        self.itemClicked.connect(self.on_item_clicked)
+    def _setup_connections(self):
+        """Setup signal connections"""
+        self.itemClicked.connect(self._on_item_clicked)
+        self.itemDoubleClicked.connect(self._on_item_double_clicked)
 
-    def apply_theme(self):
-        """Apply the current theme"""
-        if not theme_manager:
-            return
+    def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
+        """Handle item click"""
+        if item:
+            path = self._get_item_path(item)
+            value = item.data(0, Qt.ItemDataRole.UserRole)
+            self.item_selected.emit(path, value)
 
-        bg_color = theme_manager.get_color('surface')
-        text_color = theme_manager.get_color('on_surface')
-        border_color = theme_manager.get_color('outline')
+    def _on_item_double_clicked(self, item: QTreeWidgetItem, column: int):
+        """Handle item double click"""
+        if item:
+            path = self._get_item_path(item)
+            value = item.data(0, Qt.ItemDataRole.UserRole)
+            self.item_double_clicked.emit(path, value)
 
-        self.setStyleSheet(f"""
-            QTreeWidget {{
-                background-color: {bg_color.name()};
-                color: {text_color.name()};
-                border: 1px solid {border_color.name()};
-                border-radius: 8px;
-                gridline-color: {border_color.name()};
-                selection-background-color: {theme_manager.get_color('primary_container').name()};
-                selection-color: {theme_manager.get_color('on_primary_container').name()};
-            }}
-            
-            QTreeWidget::item {{
-                padding: 4px;
-                border-bottom: 1px solid {border_color.name()};
-            }}
-            
-            QTreeWidget::item:hover {{
-                background-color: {theme_manager.get_color('surface_variant').name()};
-            }}
-        """)
+    def _get_item_path(self, item: QTreeWidgetItem) -> str:
+        """Get the JSON path for an item"""
+        path_parts = []
+        current = item
 
-    def load_json(self, data: Union[str, Dict, List]):
-        """Load JSON data into tree"""
-        self.clear()
+        while current and current.parent():
+            parent = current.parent()
+            if parent:
+                # Get the key from the item
+                key = current.text(0)
+                path_parts.append(key)
+            current = parent
 
-        try:
-            if isinstance(data, str):
-                self.json_data = json.loads(data)
-            else:
-                self.json_data = data
+        path_parts.reverse()
+        return ".".join(path_parts) if path_parts else ""
 
-            self.populate_tree(self.json_data, self.invisibleRootItem(), "")
-            self.expandAll()
+    def _get_type_name(self, value: Any) -> str:
+        """Get human-readable type name"""
+        type_map = {
+            dict: "Object",
+            list: "Array",
+            str: "String",
+            int: "Number",
+            float: "Number",
+            bool: "Boolean",
+            type(None): "Null"
+        }
+        return type_map.get(type(value), str(type(value).__name__))
 
-        except json.JSONDecodeError as e:
-            error_item = QTreeWidgetItem(self)
-            error_item.setText(0, "JSON Error")
-            error_item.setText(1, str(e))
-            error_item.setText(2, "error")
+    def _format_value(self, value: Any) -> str:
+        """Format value for display with length limit"""
+        if value is None:
+            return "null"
+        elif isinstance(value, bool):
+            return "true" if value else "false"
+        elif isinstance(value, (dict, list)):
+            count = len(value)
+            type_name = "object" if isinstance(value, dict) else "array"
+            return f"{type_name} ({count} items)"
+        else:
+            str_value = str(value)
+            if len(str_value) > self._config.max_value_length:
+                return str_value[:self._config.max_value_length] + "..."
+            return str_value
 
-    def populate_tree(self, data: Any, parent: QTreeWidgetItem, path: str):
-        """Populate tree with JSON data"""
+    def _create_tree_item(self, key: str, value: Any, parent: Optional[QTreeWidgetItem] = None) -> QTreeWidgetItem:
+        """Create a tree widget item"""
+        if parent:
+            item = QTreeWidgetItem(parent)
+        else:
+            item = QTreeWidgetItem(self)
+
+        # Set key and value
+        item.setText(0, key)
+        item.setText(1, self._format_value(value))
+
+        if self._config.show_type_column:
+            item.setText(2, self._get_type_name(value))
+
+        # Store original value
+        item.setData(0, Qt.ItemDataRole.UserRole, value)
+
+        # Set icon and styling based on type
+        if isinstance(value, dict):
+            item.setExpanded(False)
+        elif isinstance(value, list):
+            item.setExpanded(False)
+
+        return item
+
+    def _populate_tree_recursive(self, data: Any, parent: Optional[QTreeWidgetItem] = None, depth: int = 0):
+        """Recursively populate the tree"""
         if isinstance(data, dict):
             for key, value in data.items():
-                item = QTreeWidgetItem(parent)
-                item.setText(0, str(key))
+                item = self._create_tree_item(str(key), value, parent)
 
-                current_path = f"{path}.{key}" if path else key
-                item.setData(0, Qt.ItemDataRole.UserRole, current_path)
+                if isinstance(value, (dict, list)) and value:
+                    self._populate_tree_recursive(value, item, depth + 1)
 
-                if isinstance(value, (dict, list)):
-                    item.setText(
-                        1, f"{type(value).__name__} ({len(value)} items)")
-                    item.setText(2, type(value).__name__)
-                    self.populate_tree(value, item, current_path)
-                else:
-                    item.setText(1, str(value))
-                    item.setText(2, type(value).__name__)
+                # Auto-expand based on config
+                if depth < self._config.auto_expand_depth:
+                    item.setExpanded(True)
 
         elif isinstance(data, list):
             for i, value in enumerate(data):
-                item = QTreeWidgetItem(parent)
-                item.setText(0, f"[{i}]")
+                item = self._create_tree_item(f"[{i}]", value, parent)
 
-                current_path = f"{path}[{i}]" if path else f"[{i}]"
-                item.setData(0, Qt.ItemDataRole.UserRole, current_path)
+                if isinstance(value, (dict, list)) and value:
+                    self._populate_tree_recursive(value, item, depth + 1)
 
-                if isinstance(value, (dict, list)):
-                    item.setText(
-                        1, f"{type(value).__name__} ({len(value)} items)")
-                    item.setText(2, type(value).__name__)
-                    self.populate_tree(value, item, current_path)
-                else:
-                    item.setText(1, str(value))
-                    item.setText(2, type(value).__name__)
+                # Auto-expand based on config
+                if depth < self._config.auto_expand_depth:
+                    item.setExpanded(True)
 
-    def on_item_clicked(self, item: QTreeWidgetItem, _column: int):
-        """Handle item click"""
-        path = item.data(0, Qt.ItemDataRole.UserRole)
-        if path and self.json_data is not None:
-            try:
-                # Navigate to the value in json_data
-                value = self.json_data
-
-                # Parse path
-                parts = self.parse_path(path)
-                for part in parts:
-                    if value is None:  # Check if value became None during path traversal
-                        break
-                    if isinstance(part, int):
-                        if isinstance(value, list) and 0 <= part < len(value):
-                            value = value[part]
-                        else:
-                            value = None  # Path is invalid
-                            break
-                    else:  # part is a string (key)
-                        if isinstance(value, dict) and part in value:
-                            value = value[part]
-                        else:
-                            value = None  # Path is invalid
-                            break
-
-                if value is not None:
-                    self.item_selected.emit(path, value)
-
-            except (KeyError, IndexError, TypeError):
-                # This might happen if json_data structure is unexpected or path is malformed
-                # Or if value becomes something not subscriptable unexpectedly
-                pass
-
-    def parse_path(self, path: str) -> List[Union[str, int]]:
-        """Parse JSON path into components"""
-        parts = []
-        current = ""
-        in_bracket = False
-
-        for char in path:
-            if char == '[':
-                if current:
-                    parts.append(current)
-                    current = ""
-                in_bracket = True
-            elif char == ']':
-                if current.isdigit():
-                    parts.append(int(current))
-                else:  # Should ideally not happen if path is well-formed for list indices
-                    # Keep as string if not a digit inside brackets
-                    parts.append(current)
-                current = ""
-                in_bracket = False
-            elif char == '.' and not in_bracket:
-                if current:
-                    parts.append(current)
-                    current = ""
-            else:
-                current += char
-
-        if current:
-            # Last part, if it's an index it should have been closed by ']'
-            # So, if in_bracket is true here, it's likely a malformed path.
-            # However, the original logic handles it as potentially an index.
-            if current.isdigit() and in_bracket:  # This case might be problematic
-                parts.append(int(current))
-            else:
-                parts.append(current)
-
-        return parts
-
-
-class FluentJsonViewer(QWidget):
-    """
-    Comprehensive JSON viewer with text and tree views
-    """
-
-    json_changed = Signal(object)  # JSON data
-    validation_changed = Signal(bool, str)  # is_valid, error_message
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.json_data = None
-        self.is_valid = True
-
-        self.setup_ui()
-        self.apply_theme()
-
-        # Setup validation timer
-        self.validation_timer = QTimer()
-        self.validation_timer.setSingleShot(True)
-        self.validation_timer.timeout.connect(self.validate_json)
-
-        # Connect to theme changes
-        if theme_manager:
-            theme_manager.theme_changed.connect(self.apply_theme)
-
-    def setup_ui(self):
-        """Setup the user interface"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        # Toolbar
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(10, 10, 10, 10)
-        toolbar_layout.setSpacing(10)
-
-        # Format button
-        self.format_btn = QPushButton("Format JSON")
-        self.format_btn.clicked.connect(self.format_json)
-        toolbar_layout.addWidget(self.format_btn)
-
-        # Minify button
-        self.minify_btn = QPushButton("Minify JSON")
-        self.minify_btn.clicked.connect(self.minify_json)
-        toolbar_layout.addWidget(self.minify_btn)
-
-        # Validate button
-        self.validate_btn = QPushButton("Validate")
-        self.validate_btn.clicked.connect(self.validate_json)
-        toolbar_layout.addWidget(self.validate_btn)
-
-        # Clear button
-        self.clear_btn = QPushButton("Clear")
-        self.clear_btn.clicked.connect(self.clear_json)
-        toolbar_layout.addWidget(self.clear_btn)
-
-        toolbar_layout.addStretch()
-
-        # Status labels
-        self.status_label = QLabel("Ready")
-        toolbar_layout.addWidget(self.status_label)
-
-        self.validation_label = QLabel("✓ Valid JSON")
-        self.validation_label.setStyleSheet("color: green; font-weight: bold;")
-        toolbar_layout.addWidget(self.validation_label)
-
-        layout.addLayout(toolbar_layout)
-
-        # Main content
-        self.tab_widget = QTabWidget()
-
-        # Text view tab
-        self.text_widget = QWidget()
-        text_layout = QVBoxLayout(self.text_widget)
-        text_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.text_edit = QTextEdit()
-        self.text_edit.setFont(QFont("Consolas", 10))
-        self.text_edit.textChanged.connect(self.on_text_changed)
-
-        # Setup syntax highlighting
-        self.highlighter = JsonSyntaxHighlighter(self.text_edit.document())
-
-        text_layout.addWidget(self.text_edit)
-        self.tab_widget.addTab(self.text_widget, "Text View")
-
-        # Tree view tab
-        self.tree_widget = FluentJsonTreeWidget()
-        self.tree_widget.item_selected.connect(self.on_tree_item_selected)
-        self.tab_widget.addTab(self.tree_widget, "Tree View")
-
-        layout.addWidget(self.tab_widget)
-
-        # Current selection info
-        self.selection_layout = QHBoxLayout()
-        self.selection_layout.setContentsMargins(10, 5, 10, 10)
-
-        self.path_label = QLabel("Path: ")
-        self.selection_layout.addWidget(self.path_label)
-
-        self.path_edit = QLineEdit()
-        self.path_edit.setReadOnly(True)
-        self.path_edit.setPlaceholderText("Select an item in tree view")
-        self.selection_layout.addWidget(self.path_edit)
-
-        layout.addLayout(self.selection_layout)
-
-    def apply_theme(self):
-        """Apply the current theme"""
-        if not theme_manager:
-            return
-
-        bg_color = theme_manager.get_color('surface')
-        text_color = theme_manager.get_color('on_surface')
-        border_color = theme_manager.get_color('outline')
-
-        self.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: {bg_color.name()};
-                color: {text_color.name()};
-                border: 1px solid {border_color.name()};
-                border-radius: 8px;
-                font-family: 'Consolas', 'Monaco', monospace;
-                font-size: 12px;
-                /* line-height: 1.4; */ /* QTextEdit does not have line-height directly */
-                padding: 10px;
-            }}
-            
-            QPushButton {{
-                background-color: {theme_manager.get_color('primary').name()};
-                color: {theme_manager.get_color('on_primary').name()};
-                border: none;
-                border-radius: 6px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }}
-            
-            QPushButton:hover {{
-                background-color: {theme_manager.get_color('primary_container').name()};
-            }}
-            
-            QPushButton:pressed {{
-                background-color: {theme_manager.get_color('secondary').name()};
-            }}
-            
-            QLineEdit {{
-                background-color: {bg_color.name()};
-                color: {text_color.name()};
-                border: 1px solid {border_color.name()};
-                border-radius: 6px;
-                padding: 6px;
-            }}
-            QTabWidget::pane {{
-                border-top: 1px solid {border_color.name()};
-                background: {bg_color.name()};
-            }}
-            QTabBar::tab {{
-                background: {theme_manager.get_color('surface_variant').name()};
-                color: {theme_manager.get_color('on_surface_variant').name()};
-                border: 1px solid {border_color.name()};
-                border-bottom: none; 
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                padding: 8px 16px;
-                margin-right: 2px;
-            }}
-            QTabBar::tab:selected {{
-                background: {bg_color.name()};
-                color: {text_color.name()};
-                border-bottom: 1px solid {bg_color.name()}; /* Make selected tab blend with pane */
-            }}
-            QTabBar::tab:hover {{
-                background: {theme_manager.get_color('surface_tint').name()};
-            }}
-        """)
-        # Apply theme to child tree widget as well
-        self.tree_widget.apply_theme()
-        # Re-initialize highlighter as theme colors might have changed
-        self.highlighter.setup_highlighting_rules()
-        self.highlighter.rehighlight()
-
-    def set_json(self, data: Union[str, Dict, List]):
-        """Set JSON data"""
-        try:
-            if isinstance(data, str):
-                self.json_data = json.loads(data)
-                formatted_text = json.dumps(
-                    self.json_data, indent=2, ensure_ascii=False)
-            else:
-                self.json_data = data
-                formatted_text = json.dumps(data, indent=2, ensure_ascii=False)
-
-            # Update text view
-            self.text_edit.setPlainText(formatted_text)
-
-            # Update tree view
-            self.tree_widget.load_json(self.json_data)
-
-            # Update status
-            self.is_valid = True
-            self.validation_label.setText("✓ Valid JSON")
-            self.validation_label.setStyleSheet(
-                "color: green; font-weight: bold;")
-            self.status_label.setText("JSON loaded successfully")
-
-            self.json_changed.emit(self.json_data)
-            self.validation_changed.emit(True, "")
-
-        except json.JSONDecodeError as e:
-            self.is_valid = False
-            self.validation_label.setText(f"✗ Invalid JSON: {e}")
-            self.validation_label.setStyleSheet(
-                "color: red; font-weight: bold;")
-            self.status_label.setText("JSON parse error")
-
-            self.validation_changed.emit(False, str(e))
-
-    def get_json(self) -> Any:
-        """Get current JSON data"""
-        return self.json_data
-
-    def get_json_text(self) -> str:
-        """Get JSON as text"""
-        return self.text_edit.toPlainText()
-
-    def on_text_changed(self):
-        """Handle text change"""
-        # Delay validation to avoid constant parsing
-        self.validation_timer.stop()
-        self.validation_timer.start(500)  # 500ms delay
-
-    def validate_json(self):
-        """Validate current JSON text"""
-        text = self.text_edit.toPlainText().strip()
-
-        if not text:
-            self.is_valid = True
-            self.json_data = None  # Ensure json_data is None for empty text
-            self.validation_label.setText("Empty")
-            self.validation_label.setStyleSheet(
-                "color: gray; font-weight: bold;")
-            self.status_label.setText("Ready")
-            self.tree_widget.clear()  # Clear tree view for empty JSON
-            self.json_changed.emit(self.json_data)
-            self.validation_changed.emit(True, "")  # Empty is considered valid
-            return
+    def set_json_data(self, data: JsonData):
+        """Set JSON data to display"""
+        self._json_data = data
+        self.clear()
 
         try:
-            self.json_data = json.loads(text)
+            if data is not None:
+                with self._batch_updates():
+                    if isinstance(data, (dict, list)):
+                        self._populate_tree_recursive(data)
+                    else:
+                        # Single value
+                        self._create_tree_item("value", data)
+        except Exception as e:
+            self._show_error(f"Error displaying JSON data: {e}")
 
-            # Update tree view
-            self.tree_widget.load_json(self.json_data)
+    @contextmanager
+    def _batch_updates(self):
+        """Context manager for batch updates"""
+        self.setUpdatesEnabled(False)
+        try:
+            yield
+        finally:
+            self.setUpdatesEnabled(True)
 
-            self.is_valid = True
-            self.validation_label.setText("✓ Valid JSON")
-            self.validation_label.setStyleSheet(
-                "color: green; font-weight: bold;")
-            self.status_label.setText("JSON is valid")
+    def _show_error(self, message: str):
+        """Show error in tree view"""
+        error_item = QTreeWidgetItem(self)
+        error_item.setText(0, "Error")
+        error_item.setText(1, message)
+        if self._config.show_type_column:
+            error_item.setText(2, "Error")
 
-            self.json_changed.emit(self.json_data)
-            self.validation_changed.emit(True, "")
+    def expand_all_recursive(self):
+        """Expand all items recursively"""
+        def expand_recursive(item: QTreeWidgetItem, depth: int):
+            item.setExpanded(True)
+            for i in range(item.childCount()):
+                child = item.child(i)
+                if child:
+                    expand_recursive(child, depth + 1)
 
-        except json.JSONDecodeError as e:
-            self.is_valid = False
-            self.json_data = None  # Invalid JSON means no valid data
-            error_msg = f"Line {e.lineno}, Column {e.colno}: {e.msg}"
-            self.validation_label.setText(f"✗ Invalid JSON")
-            self.validation_label.setStyleSheet(
-                "color: red; font-weight: bold;")
-            self.status_label.setText(error_msg)
-            # self.tree_widget.clear() # Optionally clear tree on invalid JSON
-            self.validation_changed.emit(False, error_msg)
+        with self._batch_updates():
+            for i in range(self.topLevelItemCount()):
+                top_item = self.topLevelItem(i)
+                if top_item:
+                    expand_recursive(top_item, 0)
 
-    def format_json(self):
-        """Format JSON with proper indentation"""
-        if self.is_valid and self.json_data is not None:
-            formatted = json.dumps(
-                self.json_data, indent=2, ensure_ascii=False)
-            self.text_edit.setPlainText(formatted)
-            self.status_label.setText("JSON formatted")
-        elif not self.text_edit.toPlainText().strip():
-            self.status_label.setText("Cannot format empty JSON")
-        else:
-            self.status_label.setText("Cannot format invalid JSON")
+    def collapse_all_recursive(self):
+        """Collapse all items recursively"""
+        def collapse_recursive(item: QTreeWidgetItem):
+            item.setExpanded(False)
+            for i in range(item.childCount()):
+                child = item.child(i)
+                if child:
+                    collapse_recursive(child)
 
-    def minify_json(self):
-        """Minify JSON (remove whitespace)"""
-        if self.is_valid and self.json_data is not None:
-            minified = json.dumps(self.json_data, separators=(
-                ',', ':'), ensure_ascii=False)
-            self.text_edit.setPlainText(minified)
-            self.status_label.setText("JSON minified")
-        elif not self.text_edit.toPlainText().strip():
-            self.status_label.setText("Cannot minify empty JSON")
-        else:
-            self.status_label.setText("Cannot minify invalid JSON")
+        with self._batch_updates():
+            for i in range(self.topLevelItemCount()):
+                top_item = self.topLevelItem(i)
+                if top_item:
+                    collapse_recursive(top_item)
 
-    def clear_json(self):
-        """Clear JSON content"""
-        self.text_edit.clear()
-        self.tree_widget.clear()
-        self.path_edit.clear()
-        self.json_data = None
-        self.is_valid = True
-        self.validation_label.setText("Empty")
-        self.validation_label.setStyleSheet("color: gray; font-weight: bold;")
-        self.status_label.setText("Ready")
-        self.json_changed.emit(None)
-        self.validation_changed.emit(True, "")
+    def search_items(self, query: str) -> List[QTreeWidgetItem]:
+        """Search for items matching query"""
+        if not query:
+            return []
 
-    def on_tree_item_selected(self, path: str, value: Any):
-        """Handle tree item selection"""
-        self.path_edit.setText(path)
+        matching_items = []
+        query_lower = query.lower()
 
-        # Show value details in status
-        if isinstance(value, (dict, list)):
-            self.status_label.setText(
-                f"Selected: {type(value).__name__} with {len(value)} items")
-        else:
-            self.status_label.setText(
-                f"Selected: {type(value).__name__} = {str(value)[:100]}{'...' if len(str(value)) > 100 else ''}")
+        def search_recursive(item: QTreeWidgetItem):
+            # Check key and value
+            key = item.text(0).lower()
+            value = item.text(1).lower()
 
+            if query_lower in key or query_lower in value:
+                matching_items.append(item)
 
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication, QMainWindow
+            # Search children
+            for i in range(item.childCount()):
+                child = item.child(i)
+                if child:
+                    search_recursive(child)
 
-    app = QApplication(sys.argv)
+        for i in range(self.topLevelItemCount()):
+            top_item = self.topLevelItem(i)
+            if top_item:
+                search_recursive(top_item)
 
-    # Create main window
-    window = QMainWindow()
-    window.setWindowTitle("JSON Viewer Demo")
-    window.setGeometry(100, 100, 1000, 700)
+        return matching_items
 
-    # Create JSON viewer
-    json_viewer = FluentJsonViewer()
-    window.setCentralWidget(json_viewer)
+    def highlight_search_results(self, items: List[QTreeWidgetItem]):
+        """Highlight search results"""
+        # Clear previous highlights
+        self.clearSelection()
 
-    # Load sample JSON
-    sample_json = {
-        "name": "John Doe",
-        "age": 30,
-        "address": {
-            "street": "123 Main St",
-            "city": "New York",
-            "zipcode": "10001"
-        },
-        "hobbies": ["reading", "swimming", "coding"],
-        "married": True,
-        "children": None,
-        "scores": [85.5, 92.0, 78.5]
-    }
+        # Select matching items
+        for item in items:
+            item.setSelected(True)
 
-    json_viewer.set_json(sample_json)
-
-    window.show()
-    sys.exit(app.exec())
+        # Scroll to first match
+        if items:
+            self.scrollToItem(items[0])

@@ -6,7 +6,7 @@ from .button import FluentButton, FluentIconButton, FluentToggleButton
 from .textbox import FluentLineEdit, FluentTextEdit, FluentPasswordEdit, FluentSearchBox
 from .checkbox import FluentCheckBox, FluentRadioButton, FluentRadioGroup
 from .tooltip import FluentTooltip, TooltipMixin
-from .rating import FluentRating
+from .rating import EnhancedFluentRating as FluentRating
 from .tabs import FluentTabWidget, FluentTabButton
 from .card import FluentCard, FluentImageCard, FluentActionCard
 from .accordion import FluentAccordion, FluentAccordionItem
