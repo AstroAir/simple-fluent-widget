@@ -1,27 +1,41 @@
 """
-Basic Fluent Design Components
+Basic Fluent Design Components - Organized Structure
+
+This module provides basic UI components organized by functionality:
+
+- forms: Interactive form controls and input elements
+- display: Visual display and feedback elements  
+- navigation: Navigation and structural elements
+- visual: Visual and media elements
 """
 
-from .button import FluentButton, FluentIconButton, FluentToggleButton
-from .textbox import FluentLineEdit, FluentTextEdit, FluentPasswordEdit, FluentSearchBox
-from .checkbox import FluentCheckBox, FluentRadioButton, FluentRadioGroup
-from .tooltip import FluentTooltip, TooltipMixin
-from .rating import EnhancedFluentRating as FluentRating
-from .tabs import FluentTabWidget, FluentTabButton
-from .card import FluentCard, FluentImageCard, FluentActionCard
-from .accordion import FluentAccordion, FluentAccordionItem
-from .divider import FluentDivider, FluentSeparator, FluentSection
-from .avatar import FluentAvatar, FluentAvatarGroup
-from .timeline import FluentTimeline, FluentTimelineItem
-from .switch import FluentSwitch as FluentModernSwitch, FluentSwitchGroup
-from .loading import (FluentSpinner, FluentDotLoader, FluentProgressRing, 
+# Import from organized submodules
+from .forms import *
+from .display import *
+from .navigation import *
+from .visual import *
+
+# Legacy imports for backward compatibility
+from .forms.button import FluentButton, FluentIconButton, FluentToggleButton
+from .forms.textbox import FluentLineEdit, FluentTextEdit, FluentPasswordEdit, FluentSearchBox
+from .forms.checkbox import FluentCheckBox, FluentRadioButton, FluentRadioGroup
+from .display.tooltip import FluentTooltip, TooltipMixin
+from .visual.rating import EnhancedFluentRating as FluentRating
+from .navigation.tabs import FluentTabWidget, FluentTabButton
+from .display.card import FluentCard
+from .navigation.accordion import FluentAccordion, FluentAccordionItem
+from .navigation.divider import FluentDivider, FluentSeparator, FluentSection
+from .visual.avatar import FluentAvatar, FluentAvatarGroup
+from .navigation.timeline import FluentTimeline, FluentTimelineItem
+from .forms.switch import FluentSwitch as FluentModernSwitch, FluentSwitchGroup
+from .display.loading import (FluentSpinner, FluentDotLoader, FluentProgressRing, 
                       FluentLoadingOverlay, FluentPulseLoader)
-from .alert import EnhancedFluentAlert as FluentAlert, EnhancedFluentNotification as FluentNotification, FluentMessageBar, AlertType
-from .badge import FluentBadge, FluentTag
-from .pagination import FluentPagination, FluentSimplePagination
-from .label import (FluentLabel, FluentIconLabel, FluentStatusLabel, 
+from .display.alert import EnhancedFluentAlert as FluentAlert, EnhancedFluentNotification as FluentNotification, FluentMessageBar, AlertType
+from .display.badge import FluentBadge, FluentTag
+from .navigation.pagination import FluentPagination, FluentSimplePagination
+from .display.label import (FluentLabel, FluentIconLabel, FluentStatusLabel, 
                     FluentLinkLabel, FluentLabelGroup)
-from .switch import FluentSwitch
+from .forms.switch import FluentSwitch
 
 __all__ = [
     'FluentButton', 'FluentIconButton', 'FluentToggleButton',
@@ -30,7 +44,7 @@ __all__ = [
     'FluentTooltip', 'TooltipMixin',
     'FluentRating',
     'FluentTabWidget', 'FluentTabButton',
-    'FluentCard', 'FluentImageCard', 'FluentActionCard',
+    'FluentCard',
     'FluentAccordion', 'FluentAccordionItem',
     'FluentDivider', 'FluentSeparator', 'FluentSection',
     'FluentAvatar', 'FluentAvatarGroup',

@@ -1,8 +1,11 @@
 """
-Composite Fluent Design Components - Optimized for Python 3.11+
+Composite Fluent Design Components - Organized Structure
 
-This module contains higher-level composite components that combine multiple 
-basic widgets into commonly-used UI patterns with modern Python features.
+This module contains higher-level composite components organized by functionality:
+
+- forms: Complex form systems with validation and field management
+- interface: Interface management components (navigation, toolbars)
+- containers: Container components (panels, dialogs, settings)
 
 Enhanced with:
 - Modern type system with dataclasses and slots
@@ -12,14 +15,20 @@ Enhanced with:
 - Memory-efficient state management
 """
 
-from .panels import (
+# Import from organized submodules
+from .forms import *
+from .interface import *
+from .containers import *
+
+# Legacy imports for backward compatibility
+from .containers.panels import (
     FluentSettingsPanel,
     FluentPropertiesEditor,
     FluentFormDialog,
     FluentConfirmationDialog
 )
 
-from .navigation import (
+from .interface.navigation import (
     FluentSidebar,
     FluentHeaderNavigation,
     FluentBreadcrumbBar,
@@ -31,7 +40,7 @@ from .navigation import (
     NavigationMode
 )
 
-from .forms import (
+from .forms.forms import (
     FluentFieldGroup,
     FluentValidationForm,
     FluentQuickForm,
@@ -44,7 +53,7 @@ from .forms import (
     FormFieldData
 )
 
-from .toolbars import (
+from .interface.toolbars import (
     FluentActionToolbar,
     FluentSearchToolbar,
     FluentViewToolbar,
