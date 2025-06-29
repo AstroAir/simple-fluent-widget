@@ -9,7 +9,6 @@ from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import Qt, QPropertyAnimation, QEasingCurve, Signal, QByteArray
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QMouseEvent
 
-from .theme import theme_manager
 from .animation import FluentAnimation, AnimationHelper
 
 
@@ -35,7 +34,14 @@ class FluentBaseWidget(QWidget):
 
     def _connect_signals(self):
         """Connect theme manager signals"""
-        theme_manager.theme_changed.connect(self._on_theme_changed)
+        # Delay theme manager connection until it's needed
+        try:
+            from .theme import get_theme_manager
+            theme_manager = get_theme_manager()
+            theme_manager.theme_changed.connect(self._on_theme_changed)
+        except:
+            # If theme manager can't be accessed yet, skip connection
+            pass
 
     def _on_theme_changed(self):
         """Handle theme change"""
@@ -62,7 +68,13 @@ class FluentBaseWidget(QWidget):
 
     def _get_theme_color(self, color_name: str) -> QColor:
         """Get color from theme"""
-        return theme_manager.get_color(color_name)
+        try:
+            from .theme import get_theme_manager
+            theme_manager = get_theme_manager()
+            return theme_manager.get_color(color_name)
+        except:
+            # Fallback color if theme manager is not available
+            return QColor("#0078D4")  # Default blue
 
     def _apply_hover_effect(self, painter: QPainter, rect, base_color: QColor,
                             hover_intensity: float = 0.1):

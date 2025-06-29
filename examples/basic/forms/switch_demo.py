@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QPixmap, QPainter
 
 # Import the switch components
-from components.basic.switch import FluentSwitch, FluentSwitchGroup
+from components.basic.forms.switch import FluentSwitch, FluentSwitchGroup
 from core.theme import theme_manager, ThemeMode
 
 

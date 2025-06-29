@@ -1,16 +1,15 @@
-from typing import Optional, Dict, Any, List, Callable, Tuple, Union
+from typing import Optional, Dict, Any, List, Callable
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
                                QFrame, QLabel, QPushButton, QScrollArea,
                                QLineEdit, QCheckBox, QComboBox, QSpinBox)
 from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QByteArray, Signal, Property
-from PySide6.QtGui import QFont, QIcon, QColor
+from PySide6.QtGui import QFont, QIcon
 
 from .base import FluentBaseWidget, FluentBaseContainer
-from .theme import theme_manager, get_theme_manager
 from .animation import FluentAnimation
 from .theme_integration import get_transition_manager
 from .enhanced_animations import get_theme_aware_animation
-from .enhanced_animations import get_theme_aware_animation
+from .theme import get_theme_manager
 
 
 class FluentLayoutBuilder:
@@ -96,6 +95,8 @@ class FluentLayoutBuilder:
         card = QFrame()
         card.setFrameShape(QFrame.Shape.StyledPanel)
         card.setFrameShadow(QFrame.Shadow.Raised)
+        
+        theme_manager = get_theme_manager()
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: {theme_manager.get_color('surface').name()};
@@ -145,6 +146,7 @@ class FluentStandardButton(QPushButton):
         self._apply_theme()
 
         # Connect theme changes
+        theme_manager = get_theme_manager()
         theme_manager.theme_changed.connect(self._apply_theme)
 
     @property
@@ -175,7 +177,7 @@ class FluentStandardButton(QPushButton):
 
     def _apply_theme(self):
         """Apply theme-based styling"""
-        theme = theme_manager
+        theme_manager = get_theme_manager()
 
         # Base styles
         base_style = f"""
@@ -186,9 +188,9 @@ class FluentStandardButton(QPushButton):
                 font-weight: 500;
             }}
             QPushButton:disabled {{
-                background-color: {theme.get_color('background').name()};
-                color: {theme.get_color('text_disabled').name()};
-                border-color: {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('background').name()};
+                color: {theme_manager.get_color('text_disabled').name()};
+                border-color: {theme_manager.get_color('border').name()};
             }}
         """
 
@@ -196,49 +198,49 @@ class FluentStandardButton(QPushButton):
         if self._variant == self.PRIMARY:
             style = f"""
                 QPushButton {{
-                    background-color: {theme.get_color('primary').name()};
+                    background-color: {theme_manager.get_color('primary').name()};
                     color: white;
                     border: none;
                 }}
                 QPushButton:hover {{
-                    background-color: {theme.get_color('primary_dark').name()};
+                    background-color: {theme_manager.get_color('primary_dark').name()};
                 }}
                 QPushButton:pressed {{
-                    background-color: {theme.get_color('primary_dark').name()};
+                    background-color: {theme_manager.get_color('primary_dark').name()};
                 }}
             """
         elif self._variant == self.ACCENT:
             style = f"""
                 QPushButton {{
-                    background-color: {theme.get_color('accent').name()};
+                    background-color: {theme_manager.get_color('accent').name()};
                     color: white;
                     border: none;
                 }}
                 QPushButton:hover {{
-                    background-color: {theme.get_color('primary_dark').name()};
+                    background-color: {theme_manager.get_color('primary_dark').name()};
                 }}
                 QPushButton:pressed {{
-                    background-color: {theme.get_color('primary_dark').name()};
+                    background-color: {theme_manager.get_color('primary_dark').name()};
                 }}
             """
         elif self._variant == self.OUTLINE:
             style = f"""
                 QPushButton {{
                     background-color: transparent;
-                    color: {theme.get_color('primary').name()};
-                    border: 1px solid {theme.get_color('primary').name()};
+                    color: {theme_manager.get_color('primary').name()};
+                    border: 1px solid {theme_manager.get_color('primary').name()};
                 }}
                 QPushButton:hover {{
-                    background-color: {theme.get_color('accent_light').name()};
+                    background-color: {theme_manager.get_color('accent_light').name()};
                 }}
                 QPushButton:pressed {{
-                    background-color: {theme.get_color('accent_medium').name()};
+                    background-color: {theme_manager.get_color('accent_medium').name()};
                 }}
             """
         elif self._variant == self.DANGER:
             style = f"""
                 QPushButton {{
-                    background-color: {theme.get_color('error').name()};
+                    background-color: {theme_manager.get_color('error').name()};
                     color: white;
                     border: none;
                 }}
@@ -252,7 +254,7 @@ class FluentStandardButton(QPushButton):
         elif self._variant == self.SUCCESS:
             style = f"""
                 QPushButton {{
-                    background-color: {theme.get_color('success').name()};
+                    background-color: {theme_manager.get_color('success').name()};
                     color: white;
                     border: none;
                 }}
@@ -266,16 +268,16 @@ class FluentStandardButton(QPushButton):
         else:  # Default SECONDARY
             style = f"""
                 QPushButton {{
-                    background-color: {theme.get_color('surface').name()};
-                    color: {theme.get_color('text_primary').name()};
-                    border: 1px solid {theme.get_color('border').name()};
+                    background-color: {theme_manager.get_color('surface').name()};
+                    color: {theme_manager.get_color('text_primary').name()};
+                    border: 1px solid {theme_manager.get_color('border').name()};
                 }}
                 QPushButton:hover {{
-                    background-color: {theme.get_color('accent_light').name()};
-                    border-color: {theme.get_color('primary').name()};
+                    background-color: {theme_manager.get_color('accent_light').name()};
+                    border-color: {theme_manager.get_color('primary').name()};
                 }}
                 QPushButton:pressed {{
-                    background-color: {theme.get_color('accent_medium').name()};
+                    background-color: {theme_manager.get_color('accent_medium').name()};
                 }}
             """
 
@@ -325,6 +327,7 @@ class FluentPanel(FluentBaseContainer):
         self._apply_styling()
 
         # Connect theme changes
+        theme_manager = get_theme_manager()
         theme_manager.theme_changed.connect(self._apply_styling)
 
     def _setup_ui(self):
@@ -398,20 +401,20 @@ class FluentPanel(FluentBaseContainer):
 
     def _apply_styling(self):
         """Apply panel styling"""
-        theme = theme_manager
+        theme_manager = get_theme_manager()
         self.setStyleSheet(f"""
             FluentPanel {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('surface').name()};
+                border: 1px solid {theme_manager.get_color('border').name()};
                 border-radius: 8px;
             }}
             QFrame#header {{ /* Add ID selector for specificity */
-                background-color: {theme.get_color('background').name()};
-                border-bottom: 1px solid {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('background').name()};
+                border-bottom: 1px solid {theme_manager.get_color('border').name()};
                 border-radius: 8px 8px 0 0;
             }}
             QLabel {{
-                color: {theme.get_color('text_primary').name()};
+                color: {theme_manager.get_color('text_primary').name()};
                 background-color: transparent;
                 border: none;
             }}
@@ -464,6 +467,7 @@ class FluentToolbar(QFrame):
         self._apply_styling()
 
         # Connect theme changes
+        theme_manager = get_theme_manager()
         theme_manager.theme_changed.connect(self._apply_styling)
 
     def _setup_ui(self):
@@ -519,15 +523,15 @@ class FluentToolbar(QFrame):
 
     def _apply_styling(self):
         """Apply toolbar styling"""
-        theme = theme_manager
+        theme_manager = get_theme_manager()
         self.setStyleSheet(f"""
             FluentToolbar {{
-                background-color: {theme.get_color('background').name()};
-                border-bottom: 1px solid {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('background').name()};
+                border-bottom: 1px solid {theme_manager.get_color('border').name()};
             }}
             QFrame[frameShape="5"] {{ /* Targets separators */
-                color: {theme.get_color('border').name()};
-                background-color: {theme.get_color('border').name()};
+                color: {theme_manager.get_color('border').name()};
+                background-color: {theme_manager.get_color('border').name()};
             }}
         """)
 
@@ -567,6 +571,7 @@ class FluentFormGroup(FluentPanel):
 
         # Error label (hidden by default)
         error_label = QLabel()
+        theme_manager = get_theme_manager()
         error_label.setStyleSheet(
             f"color: {theme_manager.get_color('error').name()}; font-size: 12px;")
         error_label.hide()
@@ -851,13 +856,15 @@ class FluentAnimatedPanel(FluentPanel):
             self._hover_timer.stop()
             self._remove_hover_effect()
 
-    def _apply_hover_effect(self, painter=None, rect=None, base_color=None, hover_intensity=0.1):
-        """Apply hover effect via property"""
+    def _apply_hover_effect(self, painter, rect, base_color, hover_intensity=0.1):
+        """Apply hover effect via property, compatible with base class signature"""
         if self._is_hovered:
             self.setProperty("hovering", True)
             self.style().unpolish(self)
             self.style().polish(self)
             self.update()
+        # 保持基类的绘制逻辑
+        super()._apply_hover_effect(painter, rect, base_color, hover_intensity)
 
     def _remove_hover_effect(self):
         """Remove hover effect"""
@@ -868,24 +875,24 @@ class FluentAnimatedPanel(FluentPanel):
 
     def _apply_styling(self):
         """Apply panel styling, including hover states"""
-        theme = theme_manager
+        theme_manager = get_theme_manager()
 
         self.setStyleSheet(f"""
             FluentAnimatedPanel {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('surface').name()};
+                border: 1px solid {theme_manager.get_color('border').name()};
                 border-radius: 8px;
             }}
             FluentAnimatedPanel[hovering="true"] {{
-                border-color: {theme.get_color('primary').name()};
+                border-color: {theme_manager.get_color('primary').name()};
             }}
             QFrame#header {{
-                background-color: {theme.get_color('background').name()};
-                border-bottom: 1px solid {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('background').name()};
+                border-bottom: 1px solid {theme_manager.get_color('border').name()};
                 border-radius: 8px 8px 0 0;
             }}
             QLabel {{
-                color: {theme.get_color('text_primary').name()};
+                color: {theme_manager.get_color('text_primary').name()};
                 background-color: transparent;
                 border: none;
             }}
@@ -895,7 +902,7 @@ class FluentAnimatedPanel(FluentPanel):
             self.header.setObjectName("header")
 
 
-from core.theme_integration import ThemeAwareWidget
+from .theme_integration import ThemeAwareWidget
 
 class ThemeIntegratedFluentButton(FluentStandardButton, ThemeAwareWidget):
     """Enhanced button with full theme integration and smooth transitions"""
@@ -928,18 +935,13 @@ class ThemeIntegratedFluentButton(FluentStandardButton, ThemeAwareWidget):
         FluentStandardButton.focusOutEvent(self, event)
         ThemeAwareWidget.focusOutEvent(self, event)
 
-    # 移除与父类同名的 _setup_theme_integration 和 _on_theme_transition，避免遮盖父类方法
-    
     def _setup_theme_integration(self):
         """Setup theme integration features"""
         # Register with transition coordinator
         coordinator = get_transition_manager()
         coordinator.add_component(self)
-        
-        # Register for theme transition callbacks
-        # 已移除主题动画回调注册，避免类型错误
     
-    def _on_theme_transition_started(self, transition_type: str):
+    def _on_theme_transition_started(self):
         """Handle theme transition start"""
         # Add smooth transition effects
         pass
@@ -947,11 +949,6 @@ class ThemeIntegratedFluentButton(FluentStandardButton, ThemeAwareWidget):
     def _on_theme_transition_finished(self):
         """Handle theme transition completion"""
         self.update()
-    
-    def _on_theme_transition(self, transition_type: str, is_starting: bool):
-        """Handle theme transition callbacks"""
-        if is_starting:
-            pass
     
     def _apply_theme(self):
         """Enhanced theme application with smooth transitions"""
@@ -970,7 +967,6 @@ class ThemeIntegratedFluentButton(FluentStandardButton, ThemeAwareWidget):
             self.SUCCESS: "success"
         }
         
-        color_name = theme_colors.get(self._variant, "surface")
         # Apply variant-specific styling here
 
 
@@ -995,7 +991,7 @@ class ThemeIntegratedContainer(FluentBaseContainer, ThemeAwareWidget):
         self._elevation_level = 1
         self._setup_theme_container()
     
-    def _on_theme_transition_started(self, transition_type: str):
+    def _on_theme_transition_started(self):
         """Handle theme transition start"""
         pass
     
@@ -1021,7 +1017,7 @@ class ThemeIntegratedContainer(FluentBaseContainer, ThemeAwareWidget):
             QWidget {{
                 background-color: {elevation_color.name()};
                 border-radius: {self._border_radius}px;
-                border: 1px solid {self._get_theme_color('border').name()};
+                border: 1px solid {self._theme_manager.get_color('border').name()};
             }}
         """
         self.setStyleSheet(shadow_style)
@@ -1073,7 +1069,7 @@ class FluentComponentFactory:
                 QLabel {{
                     font-size: 16px;
                     font-weight: 600;
-                    color: {card._get_theme_color('text_primary').name()};
+                    color: {card._theme_manager.get_color('text_primary').name()};
                     margin-bottom: 8px;
                 }}
             """)

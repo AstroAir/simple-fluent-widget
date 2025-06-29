@@ -9,6 +9,7 @@ This package provides a comprehensive set of UI components organized by function
 - layout: Layout and structural components (containers, dialogs)
 - controls: Interactive controls (media, picker)
 - composite: Complex composite components (forms, navigation, panels, toolbars)
+- overlays_and_flyouts: Popup and overlay components (flyouts, tooltips, dialogs)
 """
 
 from . import basic
@@ -17,7 +18,8 @@ from . import interface
 from . import layout
 from . import controls
 from . import composite
+from . import overlays_and_flyouts
 
 __all__ = [
-    'basic', 'data', 'interface', 'layout', 'controls', 'composite'
+    'basic', 'data', 'interface', 'layout', 'controls', 'composite', 'overlays_and_flyouts'
 ]

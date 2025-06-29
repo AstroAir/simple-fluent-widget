@@ -10,7 +10,7 @@ from PySide6.QtCore import (Qt, Signal, QPropertyAnimation, Property, QByteArray
                             QEasingCurve, QTimer, QRect, QSequentialAnimationGroup,
                             QAbstractAnimation, QPoint, QPauseAnimation)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QLinearGradient, QPaintEvent, QRadialGradient,
-                           QColor)
+                           QColor, QPainterPath, QFont, QFontMetrics)
 from core.theme import theme_manager
 from core.animation import FluentAnimation
 from core.enhanced_animations import FluentRevealEffect, FluentTransition
@@ -20,118 +20,96 @@ import math
 
 
 class FluentProgressBar(QProgressBar):
-    """Enhanced Fluent Design progress bar with advanced animations and performance optimizations"""
+    """Enhanced Fluent Design progress bar with modern styling and smooth animations"""
 
-    # Signals for enhanced interactivity
+    # Fluent Design signals
     animationPositionChanged = Signal(float)
     glowIntensityChanged = Signal(float)
     pulseScaleChanged = Signal(float)
     valueAnimationFinished = Signal()
-    stateChanged = Signal(str)  # 'normal', 'indeterminate', 'paused', 'error'
+    stateChanged = Signal(str)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        # Core state management
+        # Fluent Design state management
         self._state = 'normal'
         self._is_indeterminate = False
-        self._is_paused = False
         self._animation_position = 0.0
-        self._last_painted_value = 0
-        self._cached_geometry = QRect()
-        self._needs_repaint = True
-        self._current_color = None
+        self._glow_intensity = 0.0
+        self._pulse_scale = 1.0
+        self._hover_opacity = 0.0
 
-        # Enhanced animation system
-        self._progress_animation = None
-        self._indeterminate_animation = None
-        self._pulse_animation = None
-        self._glow_animation = None
-        self._state_transition_group = None
+        # Visual properties aligned with Fluent Design
+        self._corner_radius = 4
+        self._track_height = 4
+        self._is_hovering = False
+        self._show_percentage = False
 
         # Performance optimization
+        self._cached_geometry = QRect()
+        self._needs_repaint = True
         self._animation_timer = QTimer()
         self._animation_timer.timeout.connect(self._update_animation_cache)
         self._animation_timer.setInterval(16)  # 60 FPS
 
-        # Weak reference management for memory efficiency
+        # Animation management
         self._animation_refs = weakref.WeakSet()
+        self._progress_animation = None
+        self._indeterminate_animation = None
+        self._glow_animation = None
+        self._pulse_animation = None
+        self._hover_animation = None
 
-        # Visual enhancements
-        self._glow_intensity = 0.0
-        self._pulse_scale = 1.0
-        self._shadow_effect = None
-
-        # Ring-specific attributes for circular progress
-        self._ring_width = 8
-        self._rotation_angle = 0.0
-
-        self.setMinimumHeight(10)
-        self.setMaximumHeight(10)
+        # Fluent Design sizing
+        self.setMinimumHeight(4)
+        self.setMaximumHeight(4)
         self.setTextVisible(False)
 
-        self._setup_style()
+        self._setup_fluent_style()
         self._setup_animations()
-        self._setup_effects()
+        self._setup_mouse_tracking()
 
-        # Connect to theme changes with memory-safe connection
         theme_manager.theme_changed.connect(self._on_theme_changed)
 
     def __del__(self):
-        """Ensure proper cleanup of animations and timers"""
+        """Ensure proper cleanup"""
         self._cleanup_animations()
 
     def _cleanup_animations(self):
-        """Clean up animations and timers to prevent memory leaks"""
+        """Clean up animations and timers"""
         if hasattr(self, '_animation_timer') and self._animation_timer:
             self._animation_timer.stop()
 
         for animation in list(self._animation_refs):
             if animation and animation.state() == QAbstractAnimation.State.Running:
                 animation.stop()
-
         self._animation_refs.clear()
 
-    def _setup_style(self):
-        """Setup enhanced style with theme integration and performance optimizations"""
+    def _setup_fluent_style(self):
+        """Setup Fluent Design visual styling"""
         theme = theme_manager
 
-        # Cache colors for performance
+        # Fluent Design color palette
         primary_color = theme.get_color('primary')
-        border_color = theme.get_color('border')
+        control_fill = theme.get_color('control_fill_default')
+        control_stroke = theme.get_color('control_stroke_default')
 
-        # Enhanced gradient with multiple stops for depth
-        gradient_stops = [
-            (0.0, primary_color.name()),
-            (0.3, primary_color.lighter(105).name()),
-            (0.7, primary_color.lighter(110).name()),
-            (1.0, primary_color.lighter(115).name())
-        ]
-
+        # Modern Fluent Design styling with subtle effects
         style_sheet = f"""
             QProgressBar {{
                 border: none;
-                border-radius: 5px;
-                background-color: {border_color.name()};
+                border-radius: {self._corner_radius}px;
+                background-color: {control_fill.name()};
                 text-align: center;
-                box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+                height: {self._track_height}px;
                 margin: 0px;
             }}
             QProgressBar::chunk {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {gradient_stops[0][1]},
-                    stop:0.3 {gradient_stops[1][1]},
-                    stop:0.7 {gradient_stops[2][1]},
-                    stop:1 {gradient_stops[3][1]});
-                border-radius: 5px;
-                margin: 1px;
+                background-color: {primary_color.name()};
+                border-radius: {self._corner_radius}px;
                 border: none;
-            }}
-            QProgressBar:hover::chunk {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {primary_color.lighter(110).name()},
-                    stop:0.5 {primary_color.lighter(115).name()},
-                    stop:1 {primary_color.lighter(120).name()});
+                margin: 0px;
             }}
         """
 
@@ -139,17 +117,17 @@ class FluentProgressBar(QProgressBar):
         self._needs_repaint = True
 
     def _setup_animations(self):
-        """Setup enhanced animation system with performance optimizations"""
-        # Progress value animation with enhanced easing
+        """Setup Fluent Design animation system"""
+        # Value animation with Fluent easing
         self._progress_animation = QPropertyAnimation(
             self, QByteArray(b"value"))
         self._progress_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
-        self._progress_animation.setEasingCurve(FluentTransition.EASE_SMOOTH)
+        self._progress_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._progress_animation.finished.connect(
             self.valueAnimationFinished.emit)
         self._animation_refs.add(self._progress_animation)
 
-        # Enhanced indeterminate animation with custom curve
+        # Indeterminate animation with smooth motion
         self._indeterminate_animation = QPropertyAnimation(
             self, QByteArray(b"animationPosition"))
         self._indeterminate_animation.setDuration(2000)
@@ -160,30 +138,31 @@ class FluentProgressBar(QProgressBar):
             self._on_animation_frame)
         self._animation_refs.add(self._indeterminate_animation)
 
-        # Glow effect animation for enhanced visual feedback
+        # Hover animation for interactive feedback
+        self._hover_animation = QPropertyAnimation(
+            self, QByteArray(b"hoverOpacity"))
+        self._hover_animation.setDuration(FluentAnimation.DURATION_FAST)
+        self._hover_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self._animation_refs.add(self._hover_animation)
+
+        # Glow effect for milestones
         self._glow_animation = QPropertyAnimation(
             self, QByteArray(b"glowIntensity"))
-        self._glow_animation.setDuration(FluentAnimation.DURATION_SLOW)
-        self._glow_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._glow_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
+        self._glow_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
         self._animation_refs.add(self._glow_animation)
 
-        # Pulse animation for milestone feedback
+        # Pulse for completion
         self._pulse_animation = QPropertyAnimation(
             self, QByteArray(b"pulseScale"))
         self._pulse_animation.setDuration(FluentAnimation.DURATION_FAST)
         self._pulse_animation.setEasingCurve(QEasingCurve.Type.OutBack)
         self._animation_refs.add(self._pulse_animation)
 
-    def _setup_effects(self):
-        """Setup visual effects for enhanced appearance"""
-        # Subtle drop shadow for depth
-        self._shadow_effect = QGraphicsDropShadowEffect()
-        self._shadow_effect.setOffset(0, 1)
-        self._shadow_effect.setBlurRadius(3)
-        self._shadow_effect.setColor(theme_manager.get_color('shadow'))
-        # Apply effect conditionally to avoid performance issues
-        if theme_manager._current_mode.value == 'light':
-            self.setGraphicsEffect(self._shadow_effect)
+    def _setup_mouse_tracking(self):
+        """Enable mouse tracking for hover effects"""
+        self.setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
 
     def _update_animation_cache(self):
         """Update animation cache for smooth performance"""
@@ -197,12 +176,12 @@ class FluentProgressBar(QProgressBar):
         if not self._animation_timer.isActive():
             self._animation_timer.start()
 
-    # Enhanced property system with proper notifications
+    # Enhanced property system with Fluent Design properties
     def _get_animation_position(self) -> float:
         return self._animation_position
 
     def _set_animation_position(self, value: float):
-        if abs(self._animation_position - value) > 0.001:  # Threshold for performance
+        if abs(self._animation_position - value) > 0.001:
             self._animation_position = value
             self.animationPositionChanged.emit(value)
             self._needs_repaint = True
@@ -213,7 +192,7 @@ class FluentProgressBar(QProgressBar):
     def _set_glow_intensity(self, value: float):
         if abs(self._glow_intensity - value) > 0.001:
             new_value = max(0.0, min(1.0, value))
-            if abs(self._glow_intensity - new_value) > 0.001:  # Check if value actually changed
+            if abs(self._glow_intensity - new_value) > 0.001:
                 self._glow_intensity = new_value
                 self.glowIntensityChanged.emit(new_value)
                 self._needs_repaint = True
@@ -223,146 +202,134 @@ class FluentProgressBar(QProgressBar):
 
     def _set_pulse_scale(self, value: float):
         if abs(self._pulse_scale - value) > 0.001:
-            new_value = max(0.8, min(1.2, value))
-            if abs(self._pulse_scale - new_value) > 0.001:  # Check if value actually changed
+            new_value = max(0.9, min(1.1, value))
+            if abs(self._pulse_scale - new_value) > 0.001:
                 self._pulse_scale = new_value
                 self.pulseScaleChanged.emit(new_value)
                 self._needs_repaint = True
 
-    # Property declarations with notify signals
+    def _get_hover_opacity(self) -> float:
+        return self._hover_opacity
+
+    def _set_hover_opacity(self, value: float):
+        if abs(self._hover_opacity - value) > 0.001:
+            new_value = max(0.0, min(1.0, value))
+            if abs(self._hover_opacity - new_value) > 0.001:
+                self._hover_opacity = new_value
+                self._needs_repaint = True
+
+    # Property declarations
     animationPosition = Property(float, _get_animation_position, _set_animation_position,
                                  None, "Animation position for indeterminate progress")
     glowIntensity = Property(float, _get_glow_intensity, _set_glow_intensity,
                              None, "Glow intensity for visual effects")
     pulseScale = Property(float, _get_pulse_scale, _set_pulse_scale,
                           None, "Pulse scale for animation effects")
+    hoverOpacity = Property(float, _get_hover_opacity, _set_hover_opacity,
+                            None, "Hover opacity effect")
 
     def set_value_animated(self, value: int, duration: Optional[int] = None):
-        """Set progress value with enhanced animation and milestone detection"""
+        """Set progress value with Fluent Design animation"""
         old_value = self.value()
         new_value = max(self.minimum(), min(value, self.maximum()))
 
         if old_value == new_value:
             return
 
-        # Use custom duration if provided
-        animation_duration = duration if duration is not None else FluentAnimation.DURATION_MEDIUM
-
         if self._progress_animation:
             self._progress_animation.stop()
             self._progress_animation.setStartValue(old_value)
             self._progress_animation.setEndValue(new_value)
-            self._progress_animation.setDuration(animation_duration)
 
-            # Enhanced easing based on value change magnitude
-            value_diff = abs(new_value - old_value)
-            if value_diff > 25:
-                self._progress_animation.setEasingCurve(
-                    FluentTransition.EASE_SPRING)
+            if duration:
+                self._progress_animation.setDuration(duration)
             else:
-                self._progress_animation.setEasingCurve(
-                    FluentTransition.EASE_SMOOTH)
+                # Adaptive duration based on change magnitude
+                value_diff = abs(new_value - old_value)
+                if value_diff > 50:
+                    self._progress_animation.setDuration(
+                        FluentAnimation.DURATION_SLOW)
+                elif value_diff > 25:
+                    self._progress_animation.setDuration(
+                        FluentAnimation.DURATION_MEDIUM)
+                else:
+                    self._progress_animation.setDuration(
+                        FluentAnimation.DURATION_FAST)
 
             self._progress_animation.start()
-
-            # Milestone celebrations
             self._handle_milestone_effects(old_value, new_value)
 
     def _handle_milestone_effects(self, old_value: int, new_value: int):
-        """Handle special effects for milestone achievements"""
+        """Handle Fluent Design milestone celebrations"""
         milestones = [25, 50, 75, 100]
 
         for milestone in milestones:
             if old_value < milestone <= new_value:
-                self._trigger_milestone_effect(milestone)
+                if milestone == 100:
+                    self._animate_completion()
+                else:
+                    self._animate_milestone(milestone)
 
-    def _trigger_milestone_effect(self, milestone: int):
-        """Trigger visual effects for milestone achievement"""
-        if milestone == 100:
-            # Completion celebration
-            self._animate_completion()
-        else:
-            # Progress milestone pulse
-            self._animate_pulse(1.08, FluentAnimation.DURATION_FAST)
-
-        # Glow effect for all milestones
-        self._animate_glow(0.8, FluentAnimation.DURATION_MEDIUM)
-
-    def _animate_pulse(self, scale: float = 1.05, duration: int = FluentAnimation.DURATION_FAST):
-        """Animate pulse effect with scale"""
-        if (self._pulse_animation is not None and
-                self._pulse_animation.state() != QAbstractAnimation.State.Running):
-            self._pulse_animation.setStartValue(1.0)
-            self._pulse_animation.setEndValue(scale)
-            self._pulse_animation.setDuration(duration)
-            self._pulse_animation.finished.connect(
-                lambda: self._animate_pulse_return(duration // 2))
-            self._pulse_animation.start()
-
-    def _animate_pulse_return(self, duration: int):
-        """Return from pulse animation"""
-        if self._pulse_animation is not None:
-            self._pulse_animation.finished.disconnect()
-            self._pulse_animation.setStartValue(self._pulse_scale)
-            self._pulse_animation.setEndValue(1.0)
-            self._pulse_animation.setDuration(duration)
-            self._pulse_animation.start()
-
-    def _animate_glow(self, intensity: float = 0.5, duration: int = FluentAnimation.DURATION_MEDIUM):
-        """Animate glow effect"""
+    def _animate_milestone(self, milestone: int):
+        """Animate milestone achievement with subtle effects"""
+        # Gentle glow for milestone
         if self._glow_animation:
-            self._glow_animation.stop()
             self._glow_animation.setStartValue(0.0)
-            self._glow_animation.setEndValue(intensity)
-            self._glow_animation.setDuration(duration)
-            self._glow_animation.finished.connect(
-                lambda: self._animate_glow_fade(duration))
-            self._glow_animation.start()
+            self._glow_animation.setEndValue(0.4)
+            self._glow_animation.setDuration(FluentAnimation.DURATION_FAST)
 
-    def _animate_glow_fade(self, duration: int):
-        """Fade out glow effect"""
-        if self._glow_animation:
-            self._glow_animation.finished.disconnect()
-            self._glow_animation.setStartValue(self._glow_intensity)
-            self._glow_animation.setEndValue(0.0)
-            self._glow_animation.setDuration(duration)
+            def fade_glow():
+                if self._glow_animation:
+                    self._glow_animation.finished.disconnect()
+                    self._glow_animation.setStartValue(0.4)
+                    self._glow_animation.setEndValue(0.0)
+                    self._glow_animation.setDuration(
+                        FluentAnimation.DURATION_MEDIUM)
+                    self._glow_animation.start()
+
+            self._glow_animation.finished.connect(fade_glow)
             self._glow_animation.start()
 
     def _animate_completion(self):
-        """Special animation for 100% completion"""
-        # Sequential animation group for completion celebration
-        completion_group = QSequentialAnimationGroup(self)
+        """Fluent Design completion animation"""
+        # Completion pulse animation
+        if self._pulse_animation:
+            self._pulse_animation.setStartValue(1.0)
+            self._pulse_animation.setEndValue(1.05)
+            self._pulse_animation.setDuration(FluentAnimation.DURATION_FAST)
 
-        # Scale up
-        scale_up = QPropertyAnimation(self, QByteArray(b"pulseScale"))
-        scale_up.setStartValue(1.0)
-        scale_up.setEndValue(1.15)
-        scale_up.setDuration(FluentAnimation.DURATION_FAST)
-        scale_up.setEasingCurve(QEasingCurve.Type.OutBack)
+            def return_to_normal():
+                if self._pulse_animation:
+                    self._pulse_animation.finished.disconnect()
+                    self._pulse_animation.setStartValue(1.05)
+                    self._pulse_animation.setEndValue(1.0)
+                    self._pulse_animation.setDuration(
+                        FluentAnimation.DURATION_FAST)
+                    self._pulse_animation.start()
 
-        # Hold
-        hold = QPauseAnimation(FluentAnimation.DURATION_FAST // 2)
+            self._pulse_animation.finished.connect(return_to_normal)
+            self._pulse_animation.start()
 
-        # Scale down
-        scale_down = QPropertyAnimation(self, QByteArray(b"pulseScale"))
-        scale_down.setStartValue(1.15)
-        scale_down.setEndValue(1.0)
-        scale_down.setDuration(FluentAnimation.DURATION_MEDIUM)
-        scale_down.setEasingCurve(QEasingCurve.Type.OutElastic)
+        # Completion glow
+        if self._glow_animation:
+            self._glow_animation.setStartValue(0.0)
+            self._glow_animation.setEndValue(0.8)
+            self._glow_animation.setDuration(FluentAnimation.DURATION_MEDIUM)
 
-        completion_group.addAnimation(scale_up)
-        completion_group.addAnimation(hold)
-        completion_group.addAnimation(scale_down)
-        completion_group.start(
-            QAbstractAnimation.DeletionPolicy.DeleteWhenStopped)
+            def fade_completion_glow():
+                if self._glow_animation:
+                    self._glow_animation.finished.disconnect()
+                    self._glow_animation.setStartValue(0.8)
+                    self._glow_animation.setEndValue(0.0)
+                    self._glow_animation.setDuration(
+                        FluentAnimation.DURATION_SLOW)
+                    self._glow_animation.start()
 
-        # Simultaneous glow animation
-        self._animate_glow(1.0, FluentAnimation.DURATION_SLOW)
-
-        self._animation_refs.add(completion_group)
+            self._glow_animation.finished.connect(fade_completion_glow)
+            self._glow_animation.start()
 
     def set_indeterminate(self, indeterminate: bool):
-        """Set indeterminate state with smooth transitions and state management"""
+        """Set indeterminate state with Fluent transitions"""
         if self._is_indeterminate == indeterminate:
             return
 
@@ -371,16 +338,12 @@ class FluentProgressBar(QProgressBar):
 
         if indeterminate:
             self._state = 'indeterminate'
-            self._animate_state_transition(old_state, 'indeterminate')
-
             if self._indeterminate_animation:
                 self._indeterminate_animation.setStartValue(0.0)
                 self._indeterminate_animation.setEndValue(1.0)
                 self._indeterminate_animation.start()
         else:
             self._state = 'normal'
-            self._animate_state_transition(old_state, 'normal')
-
             if self._indeterminate_animation:
                 self._indeterminate_animation.stop()
             self._animation_position = 0.0
@@ -388,21 +351,8 @@ class FluentProgressBar(QProgressBar):
 
         self.stateChanged.emit(self._state)
 
-    def _animate_state_transition(self, from_state: str, to_state: str):
-        """Animate transition between states"""
-        if from_state == to_state:
-            return
-
-        # Create transition effect based on state change
-        if to_state == 'indeterminate':
-            FluentRevealEffect.fade_in(
-                self, duration=FluentAnimation.DURATION_FAST)
-        elif from_state == 'indeterminate':
-            if self._pulse_animation:
-                self._animate_pulse(1.02, FluentAnimation.DURATION_FAST)
-
     def set_state(self, state: str):
-        """Set progress state with visual feedback"""
+        """Set progress state with Fluent visual feedback"""
         valid_states = ['normal', 'indeterminate',
                         'paused', 'error', 'success']
         if state not in valid_states:
@@ -410,37 +360,238 @@ class FluentProgressBar(QProgressBar):
 
         old_state = self._state
         self._state = state
-
-        # Update visual appearance based on state
         self._update_state_appearance()
-        self._animate_state_transition(old_state, state)
-
         self.stateChanged.emit(state)
 
     def _update_state_appearance(self):
         """Update appearance based on current state"""
-        theme = theme_manager
-
-        # State-specific color schemes
-        color_schemes = {
-            'normal': theme.get_color('primary'),
-            'indeterminate': theme.get_color('primary'),
-            'paused': theme.get_color('text_secondary'),
-            'error': QColor('#d13438'),  # Red
-            'success': QColor('#107c10')  # Green
-        }
-
-        primary_color = color_schemes.get(
-            self._state, theme.get_color('primary'))
-
-        # Update stylesheet with state colors
-        self._update_style_with_color(primary_color)
-
-    def _update_style_with_color(self, color):
-        """Update appearance based on current state color"""
-        self._current_color = color
         self._needs_repaint = True
         self.update()
+
+    def set_show_percentage(self, show: bool):
+        """Enable/disable percentage text display"""
+        self._show_percentage = show
+        self.setTextVisible(show)
+        if show:
+            self.setMinimumHeight(20)
+            self.setMaximumHeight(20)
+        else:
+            self.setMinimumHeight(4)
+            self.setMaximumHeight(4)
+
+    def enterEvent(self, event):
+        """Fluent Design hover enter effect"""
+        super().enterEvent(event)
+        self._is_hovering = True
+
+        if self._hover_animation:
+            self._hover_animation.stop()
+            self._hover_animation.setStartValue(self._hover_opacity)
+            self._hover_animation.setEndValue(0.1)
+            self._hover_animation.start()
+
+    def leaveEvent(self, event):
+        """Fluent Design hover leave effect"""
+        super().leaveEvent(event)
+        self._is_hovering = False
+
+        if self._hover_animation:
+            self._hover_animation.stop()
+            self._hover_animation.setStartValue(self._hover_opacity)
+            self._hover_animation.setEndValue(0.0)
+            self._hover_animation.start()
+
+    def paintEvent(self, event: QPaintEvent):
+        """Enhanced Fluent Design paint event"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = self.rect()
+        theme = theme_manager
+
+        # Apply pulse scale transform
+        if abs(self._pulse_scale - 1.0) > 0.01:
+            center = rect.center()
+            painter.save()
+            painter.translate(center)
+            painter.scale(self._pulse_scale, self._pulse_scale)
+            painter.translate(-center)
+
+        # Draw progress based on state
+        if self._is_indeterminate:
+            self._paint_indeterminate_progress(painter, rect, theme)
+        else:
+            self._paint_determinate_progress(painter, rect, theme)
+
+        # Draw percentage text if enabled
+        if self._show_percentage and not self._is_indeterminate:
+            self._paint_percentage_text(painter, rect, theme)
+
+        if abs(self._pulse_scale - 1.0) > 0.01:
+            painter.restore()
+
+        # Draw glow effect
+        if self._glow_intensity > 0.01:
+            self._paint_glow_effect(painter, rect, theme)
+
+    def _paint_determinate_progress(self, painter: QPainter, rect: QRect, theme):
+        """Paint determinate progress with Fluent Design styling"""
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        # Background track
+        track_rect = QRect(0, rect.height() // 2 - self._track_height // 2,
+                           rect.width(), self._track_height)
+
+        # Control fill color from theme
+        control_fill = theme.get_color('control_fill_default')
+        if self._is_hovering:
+            control_fill = theme.get_color('control_fill_secondary')
+
+        painter.setBrush(QBrush(control_fill))
+        painter.drawRoundedRect(
+            track_rect, self._corner_radius, self._corner_radius)
+
+        # Progress fill
+        if self.maximum() > self.minimum() and self.value() > self.minimum():
+            progress_width = int((self.value() - self.minimum()) /
+                                 (self.maximum() - self.minimum()) * track_rect.width())
+
+            if progress_width > 0:
+                progress_rect = QRect(track_rect.x(), track_rect.y(),
+                                      progress_width, track_rect.height())
+
+                # State-based colors
+                fill_color = self._get_state_color(theme)
+
+                # Add hover effect
+                if self._hover_opacity > 0:
+                    hover_color = fill_color.lighter(110)
+                    fill_color = self._blend_colors(
+                        fill_color, hover_color, self._hover_opacity)
+
+                painter.setBrush(QBrush(fill_color))
+                painter.drawRoundedRect(
+                    progress_rect, self._corner_radius, self._corner_radius)
+
+    def _paint_indeterminate_progress(self, painter: QPainter, rect: QRect, theme):
+        """Paint indeterminate progress with Fluent animation"""
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        # Background track
+        track_rect = QRect(0, rect.height() // 2 - self._track_height // 2,
+                           rect.width(), self._track_height)
+
+        control_fill = theme.get_color('control_fill_default')
+        painter.setBrush(QBrush(control_fill))
+        painter.drawRoundedRect(
+            track_rect, self._corner_radius, self._corner_radius)
+
+        # Animated progress dot
+        dot_width = int(track_rect.width() * 0.3)  # 30% of track width
+        dot_position = int((track_rect.width() - dot_width)
+                           * self._animation_position)
+
+        dot_rect = QRect(track_rect.x() + dot_position, track_rect.y(),
+                         dot_width, track_rect.height())
+
+        fill_color = self._get_state_color(theme)
+        painter.setBrush(QBrush(fill_color))
+        painter.drawRoundedRect(
+            dot_rect, self._corner_radius, self._corner_radius)
+
+    def _paint_percentage_text(self, painter: QPainter, rect: QRect, theme):
+        """Paint percentage text with Fluent typography"""
+        if self.maximum() <= self.minimum():
+            return
+
+        percentage = int((self.value() - self.minimum()) /
+                         (self.maximum() - self.minimum()) * 100)
+        text = f"{percentage}%"
+
+        # Fluent Design font
+        font = QFont("Segoe UI", 9)
+        font.setWeight(QFont.Weight.Normal)
+        painter.setFont(font)
+
+        # Text color from theme
+        text_color = theme.get_color('text_primary')
+        painter.setPen(QPen(text_color))
+
+        # Center text
+        font_metrics = QFontMetrics(font)
+        text_rect = font_metrics.boundingRect(text)
+        x = (rect.width() - text_rect.width()) // 2
+        y = rect.height() // 2 + text_rect.height() // 2 - 2
+
+        painter.drawText(x, y, text)
+
+    def _paint_glow_effect(self, painter: QPainter, rect: QRect, theme):
+        """Paint glow effect for milestones"""
+        if self._glow_intensity <= 0.01:
+            return
+
+        glow_color = self._get_state_color(theme)
+        glow_color.setAlpha(int(self._glow_intensity * 60))
+
+        # Glow around the entire progress bar
+        glow_rect = rect.adjusted(-2, -1, 2, 1)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(glow_color))
+        painter.drawRoundedRect(
+            glow_rect, self._corner_radius + 2, self._corner_radius + 2)
+
+    def _get_state_color(self, theme) -> QColor:
+        """Get color based on current state"""
+        state_colors = {
+            'normal': theme.get_color('accent_default'),
+            'indeterminate': theme.get_color('accent_default'),
+            'paused': theme.get_color('text_secondary'),
+            'error': QColor('#c42b1c'),  # Fluent error red
+            'success': QColor('#107c10')  # Fluent success green
+        }
+        return state_colors.get(self._state, theme.get_color('accent_default'))
+
+    def _blend_colors(self, color1: QColor, color2: QColor, ratio: float) -> QColor:
+        """Blend two colors with given ratio"""
+        r = int(color1.red() * (1 - ratio) + color2.red() * ratio)
+        g = int(color1.green() * (1 - ratio) + color2.green() * ratio)
+        b = int(color1.blue() * (1 - ratio) + color2.blue() * ratio)
+        a = int(color1.alpha() * (1 - ratio) + color2.alpha() * ratio)
+        return QColor(r, g, b, a)
+
+    def _on_theme_changed(self, _theme_name: str):
+        """Handle theme changes with Fluent transitions"""
+        self._setup_fluent_style()
+
+        # Smooth transition on theme change
+        fade_out = FluentRevealEffect.fade_out(
+            self, duration=FluentAnimation.DURATION_FAST)
+
+        def apply_and_fade_in():
+            self.update()
+            FluentRevealEffect.fade_in(
+                self, duration=FluentAnimation.DURATION_FAST)
+
+        if fade_out:
+            fade_out.finished.connect(apply_and_fade_in)
+        else:
+            apply_and_fade_in()
+
+    # Public API methods for better integration
+    def set_corner_radius(self, radius: int):
+        """Set corner radius for customization"""
+        if radius >= 0:
+            self._corner_radius = radius
+            self._setup_fluent_style()
+
+    def set_track_height(self, height: int):
+        """Set track height for customization"""
+        if height > 0:
+            self._track_height = height
+            self.setMinimumHeight(height)
+            self.setMaximumHeight(height)
+            self._setup_fluent_style()
 
     def pause_animation(self):
         """Pause all animations"""
@@ -459,129 +610,10 @@ class FluentProgressBar(QProgressBar):
         self.set_state(
             'normal' if not self._is_indeterminate else 'indeterminate')
 
-    def paintEvent(self, event: QPaintEvent):
-        """Enhanced paint event with performance optimizations and visual effects"""
-        painter = QPainter(self)
-        painter.setRenderHints(
-            QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
 
-        rect = self.rect().adjusted(self._ring_width // 2, self._ring_width // 2,
-                                    -self._ring_width // 2, -self._ring_width // 2)
-
-        theme = theme_manager
-        # Determine color based on state
-        state_colors = {
-            'normal': theme.get_color('primary'),
-            'indeterminate': theme.get_color('primary'),
-            'paused': theme.get_color('text_secondary'),
-            'error': QColor('#d13438'),
-            'success': QColor('#107c10')
-        }
-        current_color = state_colors.get(
-            self._state, theme.get_color('primary'))
-        if self._current_color:
-            current_color = self._current_color
-
-        # Apply pulse scale transform
-        if abs(self._pulse_scale - 1.0) > 0.01:
-            center = self.rect().center()
-            painter.save()
-            painter.translate(center)
-            painter.scale(self._pulse_scale, self._pulse_scale)
-            painter.translate(-center)
-
-        if self._is_indeterminate:
-            self._paint_indeterminate_ring(painter, rect, current_color)
-        else:
-            self._paint_determinate_ring(painter, rect, current_color)
-
-        if abs(self._pulse_scale - 1.0) > 0.01:
-            painter.restore()
-
-        if self._glow_intensity > 0.01:
-            self._paint_ring_glow_effect(painter, self.rect(), current_color)
-
-    def _paint_determinate_ring(self, painter: QPainter, rect: QRect, color: QColor):
-        """Paints the determinate progress ring."""
-        painter.setPen(Qt.PenStyle.NoPen)
-        bg_color = theme_manager.get_color('border')
-        bg_color.setAlpha(100)
-        painter.setBrush(bg_color)
-
-        pen = QPen(color)
-        pen.setWidth(self._ring_width)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        if self.maximum() > self.minimum():
-            span_angle = (self.value() - self.minimum()) / \
-                (self.maximum() - self.minimum()) * 360.0
-        else:
-            span_angle = 0.0
-
-        start_angle = 90.0  # Start at the top
-        painter.drawArc(rect, int(start_angle * 16), int(-span_angle * 16))
-
-    def _paint_indeterminate_ring(self, painter: QPainter, rect: QRect, color: QColor):
-        """Paints the indeterminate progress ring."""
-        pen = QPen(color)
-        pen.setWidth(self._ring_width)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        arc_length = 90.0  # Degrees
-        start_angle = 360 * self._animation_position  # Current rotation
-        painter.drawArc(rect, int(start_angle * 16), int(arc_length * 16))
-
-    def _paint_ring_glow_effect(self, painter: QPainter, base_rect: QRect, color: QColor):
-        """Paint glow effect around progress ring"""
-        if self.value() <= 0 and not self._is_indeterminate:
-            return
-
-        glow_color = QColor(color)
-        glow_color.setAlpha(int(self._glow_intensity * 80))
-
-        glow_pen = QPen(glow_color)
-        glow_pen.setWidth(self._ring_width + 4)
-        glow_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(glow_pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        draw_rect_glow = base_rect
-
-        if self._is_indeterminate:
-            arc_length = 90.0
-            start_angle = 360 * self._animation_position
-            painter.drawArc(draw_rect_glow, int(
-                start_angle * 16), int(arc_length * 16))
-        else:
-            if self.maximum() > self.minimum():
-                span_angle = (self.value() - self.minimum()) / \
-                    (self.maximum() - self.minimum()) * 360.0
-            else:
-                span_angle = 0.0
-            start_angle = 90.0
-            painter.drawArc(draw_rect_glow, int(
-                start_angle * 16), int(-span_angle * 16))
-
-    def _on_theme_changed(self, _theme_name: str):
-        """Enhanced theme change handling with smooth transition"""
-        fade_out_anim = FluentRevealEffect.fade_out(
-            self, duration=FluentAnimation.DURATION_FAST)
-
-        def _apply_and_fade_in():
-            self._setup_style()
-            self.update()
-            FluentRevealEffect.fade_in(
-                self, duration=FluentAnimation.DURATION_FAST)
-
-        if fade_out_anim:
-            fade_out_anim.finished.connect(_apply_and_fade_in)
-        else:
-            _apply_and_fade_in()
-
+    def is_indeterminate(self) -> bool:
+        """Return whether the progress bar is in indeterminate mode."""
+        return self._is_indeterminate
 
 class FluentSlider(QSlider):
     """Enhanced Fluent Design slider with advanced interactions and accessibility"""
