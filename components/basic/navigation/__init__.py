@@ -14,6 +14,7 @@ from .segmented import *
 from .tabs import *
 from .stepper import *
 from .timeline import *
+from .treeview import *
 
 __all__ = [
     # Export all navigation classes and functions

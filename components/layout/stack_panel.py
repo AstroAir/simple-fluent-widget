@@ -25,7 +25,7 @@ class StackOrientation(Enum):
     HORIZONTAL = "horizontal"
 
 
-class FluentStackPanel(QFrame, FluentControlBase, FluentThemeAware):
+class FluentStackPanel(FluentControlBase):
     """
     A stack layout container with Fluent Design styling.
 
@@ -41,8 +41,6 @@ class FluentStackPanel(QFrame, FluentControlBase, FluentThemeAware):
     def __init__(self, orientation: StackOrientation = StackOrientation.VERTICAL,
                  parent: Optional[QWidget] = None):
         super().__init__(parent)
-        FluentControlBase.__init__(self)
-        FluentThemeAware.__init__(self)
 
         self._orientation = orientation
         self._spacing = 8
@@ -286,13 +284,15 @@ class FluentStackPanel(QFrame, FluentControlBase, FluentThemeAware):
 
     def apply_theme(self):
         """Apply the current theme to the stack panel."""
-        theme = self.get_current_theme()
-        if not theme:
+        # Use theme manager directly instead of missing method
+        from core.theme import theme_manager
+        
+        if not theme_manager:
             return
 
         # Update CSS variables based on theme
         style_vars = {
-            '--stack-background': theme.get('surface_background', 'transparent'),
+            '--stack-background': 'transparent',  # Fallback value
         }
 
         # Apply updated styling

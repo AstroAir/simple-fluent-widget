@@ -1,46 +1,43 @@
 """
-Fluent Design Layout and Container Components
-Advanced layout containers and panel components for enterprise applications
+Refactored Fluent Design Layout and Container Components
+Updated to use consistent base classes and modern patterns
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                QTabWidget, QFrame, QLabel, QPushButton,
                                QStackedWidget, QGraphicsDropShadowEffect)
 from PySide6.QtCore import (Qt, Signal, QPropertyAnimation, QEasingCurve,
-                            QRect, QByteArray)
+                            QRect, QByteArray, QTimer)
 from PySide6.QtGui import QFont, QColor
 from core.theme import theme_manager
 from typing import Optional
 
+from .layout_base import FluentContainerBase, FluentLayoutBase
 
-class FluentCard(QFrame):
-    """Fluent Design style card container"""
 
-    clicked = Signal()
+class FluentCard(FluentContainerBase):
+    """
+    Enhanced Fluent Design style card container
+    Now uses consistent base class with improved theming
+    """
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
 
-        self._elevated = True
-        self._clickable = False
-        self._corner_radius = 8
-        self._padding = 16
         self._header_text = ""
         self._is_hovered = False
 
-        self.setFrameStyle(QFrame.Shape.NoFrame)
-        self._setup_layout()
-        self._setup_style()
-        self._setup_effects()
+        self._setup_card_layout()
+        self._apply_card_styling()
 
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def _setup_layout(self):
-        """Setup layout"""
+    def _setup_card_layout(self):
+        """Setup card layout structure"""
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(self._padding, self._padding,
-                                            self._padding, self._padding)
-        self.main_layout.setSpacing(12)
+        self.main_layout.setContentsMargins(
+            self._padding.left(), self._padding.top(),
+            self._padding.right(), self._padding.bottom()
+        )
+        self.main_layout.setSpacing(self._spacing)
 
         # Header area
         self.header_layout = QHBoxLayout()
@@ -58,31 +55,18 @@ class FluentCard(QFrame):
         self.main_layout.addLayout(self.header_layout)
         self.main_layout.addLayout(self.content_layout)
 
-    def _setup_effects(self):
-        """Setup shadow effects"""
-        if self._elevated:
-            shadow = QGraphicsDropShadowEffect()
-            shadow.setBlurRadius(20)
-            shadow.setColor(QColor(0, 0, 0, 50))
-            shadow.setOffset(0, 4)
-            self.setGraphicsEffect(shadow)
+    def _apply_card_styling(self):
+        """Apply card-specific styling using base class"""
+        self._apply_container_styling()
 
-    def setElevated(self, elevated: bool):
-        """Set elevation effect"""
-        self._elevated = elevated
-        if elevated:
-            self._setup_effects()
-        else:
-            # Clear graphics effect by setting a new empty one
-            self.setGraphicsEffect(QGraphicsDropShadowEffect())
-
-    def setClickable(self, clickable: bool):
-        """Set clickable state"""
-        self._clickable = clickable
-        if clickable:
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-        else:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+    def _apply_custom_theme_tokens(self, tokens):
+        """Apply card-specific theme tokens"""
+        super()._apply_custom_theme_tokens(tokens)
+        
+        # Update spacing from theme
+        self._spacing = tokens.get('spacing_md', 12)
+        if hasattr(self, 'main_layout'):
+            self.main_layout.setSpacing(self._spacing)
 
     def setHeaderText(self, text: str):
         """Set header text"""
@@ -98,72 +82,35 @@ class FluentCard(QFrame):
         """Add layout to content area"""
         self.content_layout.addLayout(layout)
 
-    def mousePressEvent(self, event):
-        """Handle mouse press"""
-        if self._clickable and event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-        super().mousePressEvent(event)
-
     def enterEvent(self, event):
         """Handle mouse enter"""
         self._is_hovered = True
-        self._animate_hover(True)
+        if self._clickable:
+            self._animate_hover(True)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         """Handle mouse leave"""
         self._is_hovered = False
-        self._animate_hover(False)
+        if self._clickable:
+            self._animate_hover(False)
         super().leaveEvent(event)
 
     def _animate_hover(self, hovered: bool):
         """Animate hover effect"""
-        if not self._clickable:
+        if not self._layout_animations_enabled:
             return
 
-        self._hover_animation = QPropertyAnimation(
-            self, QByteArray(b"geometry"))
-        self._hover_animation.setDuration(200)
-        self._hover_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-        current_rect = self.geometry()
-        if hovered:
-            # Slight scale up effect
-            target_rect = QRect(current_rect.x() - 2, current_rect.y() - 2,
-                                current_rect.width() + 4, current_rect.height() + 4)
-        else:
-            # Return to original size
-            target_rect = current_rect
-
-        self._hover_animation.setStartValue(current_rect)
-        self._hover_animation.setEndValue(target_rect)
-        self._hover_animation.start()
-
-    def _setup_style(self):
-        """Setup style"""
-        theme = theme_manager
-
-        bg_color = theme.get_color('surface')
-        if self._is_hovered and self._clickable:
-            bg_color = theme.get_color('accent_light')
-
-        style_sheet = f"""
-            FluentCard {{
-                background-color: {bg_color.name()};
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: {self._corner_radius}px;
-            }}
-        """
-
-        self.setStyleSheet(style_sheet)
-
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()
+        self.animate_layout_change(
+            "hover", "geometry",
+            self.geometry(),
+            self.geometry().adjusted(-2 if hovered else 2, -2 if hovered else 2,
+                                   2 if hovered else -2, 2 if hovered else -2)
+        )
 
 
-class FluentExpander(QWidget):
-    """Fluent Design style expandable container"""
+class FluentExpander(FluentContainerBase):
+    """Enhanced Fluent Design style expandable container"""
 
     expanded = Signal(bool)
 
@@ -174,13 +121,10 @@ class FluentExpander(QWidget):
         self._is_expanded = False
         self._animation_duration = 300
 
-        self._setup_ui()
-        self._setup_style()
+        self._setup_expander_ui()
 
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def _setup_ui(self):
-        """Setup UI"""
+    def _setup_expander_ui(self):
+        """Setup expander UI"""
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
@@ -219,6 +163,11 @@ class FluentExpander(QWidget):
         self.main_layout.addWidget(self.header)
         self.main_layout.addWidget(self.content_container)
 
+    def _apply_custom_theme_tokens(self, tokens):
+        """Apply expander-specific theme tokens"""
+        super()._apply_custom_theme_tokens(tokens)
+        self._animation_duration = tokens.get('animation_duration_normal', 300)
+
     def addWidget(self, widget: QWidget):
         """Add widget to content area"""
         self.content_layout.addWidget(widget)
@@ -244,122 +193,139 @@ class FluentExpander(QWidget):
 
     def _animate_expansion(self):
         """Animate expansion/collapse"""
-        # Icon rotation animation (simplified - just change text)
+        # Icon rotation
         if self._is_expanded:
             self.expand_icon.setText("▼")
         else:
             self.expand_icon.setText("▶")
 
         # Content height animation
-        self._height_animation = QPropertyAnimation(
-            self.content_container, QByteArray(b"maximumHeight"))
-        self._height_animation.setDuration(self._animation_duration)
-        self._height_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-        if self._is_expanded:
-            self.content_container.setVisible(True)
-            target_height = self.content_container.sizeHint().height()
-            self._height_animation.setStartValue(0)
-            self._height_animation.setEndValue(target_height)
+        if self._layout_animations_enabled:
+            target_height = (self.content_container.sizeHint().height() 
+                           if self._is_expanded else 0)
+            
+            self.animate_layout_change(
+                "expansion", "maximumHeight",
+                self.content_container.maximumHeight(),
+                target_height,
+                self._on_expansion_finished
+            )
         else:
-            self._height_animation.setStartValue(
-                self.content_container.height())
-            self._height_animation.setEndValue(0)
-            self._height_animation.finished.connect(
-                lambda: self.content_container.setVisible(False))
+            # Immediate change
+            if self._is_expanded:
+                self.content_container.setVisible(True)
+                self.content_container.setMaximumHeight(16777215)
+            else:
+                self.content_container.setMaximumHeight(0)
+                self.content_container.setVisible(False)
 
-        self._height_animation.start()
-
-    def _setup_style(self):
-        """Setup style"""
-        theme = theme_manager
-
-        style_sheet = f"""
-            FluentExpander {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: 8px;
-            }}
-            QPushButton {{
-                background-color: transparent;
-                border: none;
-                text-align: left;
-                color: {theme.get_color('text_primary').name()};
-            }}
-            QPushButton:hover {{
-                background-color: {theme.get_color('accent_light').name()};
-            }}
-            QPushButton:pressed {{
-                background-color: {theme.get_color('accent_medium').name()};
-            }}
-            QLabel {{
-                color: {theme.get_color('text_primary').name()};
-                background-color: transparent;
-            }}
-        """
-
-        self.setStyleSheet(style_sheet)
-
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()
+    def _on_expansion_finished(self):
+        """Handle expansion animation finished"""
+        if self._is_expanded:
+            self.content_container.setMaximumHeight(16777215)
+        else:
+            self.content_container.setVisible(False)
 
 
 class FluentSplitter(QSplitter):
-    """Fluent Design style splitter"""
+    """Enhanced Fluent Design style splitter"""
 
     def __init__(self, orientation: Qt.Orientation = Qt.Orientation.Horizontal,
                  parent: Optional[QWidget] = None):
         super().__init__(orientation, parent)
+        self._layout_helper = FluentLayoutBase(parent)
+        self._apply_splitter_styling()
 
-        self._setup_style()
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def _setup_style(self):
-        """Setup style"""
-        theme = theme_manager
+    def _apply_splitter_styling(self):
+        """Apply splitter styling"""
+        if not theme_manager:
+            return
 
         style_sheet = f"""
             QSplitter::handle {{
-                background-color: {theme.get_color('border').name()};
-                border: 1px solid {theme.get_color('border').name()};
+                background-color: {theme_manager.get_color('border').name()};
+                border: 1px solid {theme_manager.get_color('border').name()};
+                border-radius: 3px;
             }}
             QSplitter::handle:horizontal {{
                 width: 6px;
-                border-radius: 3px;
                 margin: 2px 0;
             }}
             QSplitter::handle:vertical {{
                 height: 6px;
-                border-radius: 3px;
                 margin: 0 2px;
             }}
             QSplitter::handle:hover {{
-                background-color: {theme.get_color('primary').name()};
+                background-color: {theme_manager.get_color('primary').name()};
             }}
             QSplitter::handle:pressed {{
-                background-color: {theme.get_color('primary').darker(110).name()};
+                background-color: {theme_manager.get_color('primary').darker(110).name()};
             }}
         """
-
         self.setStyleSheet(style_sheet)
 
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()
+    def _apply_custom_theme_tokens(self, tokens):
+        """Apply splitter-specific theme tokens"""
+        # Use layout helper for theme functionality if needed
+        self._apply_splitter_styling()
 
 
 class FluentTabWidget(QTabWidget):
-    """Fluent Design style tab widget"""
+    """Enhanced Fluent Design style tab widget"""
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-
+        self._layout_helper = FluentLayoutBase(parent)
+        
         self._tab_position = QTabWidget.TabPosition.North
         self._closable_tabs = False
 
-        self._setup_style()
-        theme_manager.theme_changed.connect(self._on_theme_changed)
+        self._apply_tab_styling()
+
+    def _apply_tab_styling(self):
+        """Apply tab styling"""
+        if not theme_manager:
+            return
+
+        style_sheet = f"""
+            QTabWidget::pane {{
+                background-color: {theme_manager.get_color('surface').name()};
+                border: 1px solid {theme_manager.get_color('border').name()};
+                border-radius: {self._corner_radius}px;
+                margin-top: -1px;
+            }}
+            QTabWidget::tab-bar {{
+                alignment: left;
+            }}
+            QTabBar::tab {{
+                background-color: {theme_manager.get_color('background').name()};
+                color: {theme_manager.get_color('text_secondary').name()};
+                border: 1px solid {theme_manager.get_color('border').name()};
+                padding: 8px 16px;
+                margin-right: 2px;
+                border-top-left-radius: {self._corner_radius}px;
+                border-top-right-radius: {self._corner_radius}px;
+                font-size: 13px;
+                font-weight: 500;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {theme_manager.get_color('surface').name()};
+                color: {theme_manager.get_color('text_primary').name()};
+                border-bottom-color: {theme_manager.get_color('surface').name()};
+                font-weight: 600;
+            }}
+            QTabBar::tab:hover:!selected {{
+                background-color: {theme_manager.get_color('accent_light').name()};
+                color: {theme_manager.get_color('text_primary').name()};
+            }}
+        """
+        self.setStyleSheet(style_sheet)
+
+    def _apply_custom_theme_tokens(self, tokens):
+        """Apply tab-specific theme tokens"""
+        # Use layout helper for theme functionality if needed
+        self._corner_radius = tokens.get('border_radius', 8)
+        self._apply_tab_styling()
 
     def setTabsClosable(self, closable: bool):
         """Set tabs closable"""
@@ -370,63 +336,11 @@ class FluentTabWidget(QTabWidget):
         """Set tab position"""
         self._tab_position = position
         super().setTabPosition(position)
-        self._setup_style()
-
-    def _setup_style(self):
-        """Setup style"""
-        theme = theme_manager
-
-        style_sheet = f"""
-            QTabWidget::pane {{
-                background-color: {theme.get_color('surface').name()};
-                border: 1px solid {theme.get_color('border').name()};
-                border-radius: 8px;
-                margin-top: -1px;
-            }}
-            QTabWidget::tab-bar {{
-                alignment: left;
-            }}
-            QTabBar::tab {{
-                background-color: {theme.get_color('background').name()};
-                color: {theme.get_color('text_secondary').name()};
-                border: 1px solid {theme.get_color('border').name()};
-                padding: 8px 16px;
-                margin-right: 2px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                font-size: 13px;
-                font-weight: 500;
-            }}
-            QTabBar::tab:selected {{
-                background-color: {theme.get_color('surface').name()};
-                color: {theme.get_color('text_primary').name()};
-                border-bottom-color: {theme.get_color('surface').name()};
-                font-weight: 600;
-            }}
-            QTabBar::tab:hover:!selected {{
-                background-color: {theme.get_color('accent_light').name()};
-                color: {theme.get_color('text_primary').name()};
-            }}
-            QTabBar::close-button {{
-                image: none;
-                border: none;
-                padding: 2px;
-            }}
-            QTabBar::close-button:hover {{
-                background-color: {theme.get_color('accent_medium').name()};
-                border-radius: 4px;
-            }}
-        """
-
-        self.setStyleSheet(style_sheet)
-
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()
+        self._apply_tab_styling()
 
 
-class FluentInfoBar(QFrame):
-    """Fluent Design style information bar"""
+class FluentInfoBar(FluentContainerBase):
+    """Enhanced Fluent Design style information bar"""
 
     class Severity:
         INFO = "info"
@@ -449,13 +363,10 @@ class FluentInfoBar(QFrame):
         self._closable = closable
         self._actions = []
 
-        self._setup_ui()
-        self._setup_style()
+        self._setup_info_bar_ui()
 
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def _setup_ui(self):
-        """Setup UI"""
+    def _setup_info_bar_ui(self):
+        """Setup info bar UI"""
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(12)
@@ -473,13 +384,13 @@ class FluentInfoBar(QFrame):
         self.title_label = QLabel(self._title)
         self.title_label.setFont(QFont("Segoe UI", 12, QFont.Weight.DemiBold))
 
+        content_layout.addWidget(self.title_label)
+
         if self._message:
             self.message_label = QLabel(self._message)
             self.message_label.setFont(QFont("Segoe UI", 11))
             self.message_label.setWordWrap(True)
             content_layout.addWidget(self.message_label)
-
-        content_layout.addWidget(self.title_label)
 
         # Actions
         self.actions_layout = QHBoxLayout()
@@ -509,44 +420,36 @@ class FluentInfoBar(QFrame):
         self.icon_label.setText(icon_text)
         self.icon_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
 
-    def addActionButton(self, action_name: str, action_text: str):
-        """Add action button (renamed to avoid conflict with QWidget.addAction)"""
-        action_btn = QPushButton(action_text)
-        action_btn.clicked.connect(
-            lambda: self.action_clicked.emit(action_name))
+    def _apply_custom_theme_tokens(self, tokens):
+        """Apply info bar specific theme tokens"""
+        super()._apply_custom_theme_tokens(tokens)
+        self._apply_severity_styling()
 
-        self._actions.append((action_name, action_btn))
-        self.actions_layout.addWidget(action_btn)
-
-    def _close_info_bar(self):
-        """Close info bar"""
-        self.closed.emit()
-        self.deleteLater()
-
-    def _setup_style(self):
-        """Setup style"""
-        theme = theme_manager
+    def _apply_severity_styling(self):
+        """Apply severity-specific styling"""
+        if not theme_manager:
+            return
 
         # Severity colors
         severity_colors = {
-            self.Severity.INFO: theme.get_color('primary'),
+            self.Severity.INFO: theme_manager.get_color('primary'),
             self.Severity.SUCCESS: QColor("#28a745"),
             self.Severity.WARNING: QColor("#ffc107"),
             self.Severity.ERROR: QColor("#dc3545")
         }
 
         accent_color = severity_colors.get(
-            self._severity, theme.get_color('primary'))
+            self._severity, theme_manager.get_color('primary'))
 
         style_sheet = f"""
             FluentInfoBar {{
-                background-color: {theme.get_color('surface').name()};
+                background-color: {theme_manager.get_color('surface').name()};
                 border: 1px solid {accent_color.name()};
                 border-left: 4px solid {accent_color.name()};
-                border-radius: 8px;
+                border-radius: {self._corner_radius}px;
             }}
             QLabel {{
-                color: {theme.get_color('text_primary').name()};
+                color: {theme_manager.get_color('text_primary').name()};
                 background-color: transparent;
                 border: none;
             }}
@@ -563,16 +466,25 @@ class FluentInfoBar(QFrame):
                 background-color: {accent_color.darker(110).name()};
             }}
         """
-
         self.setStyleSheet(style_sheet)
 
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()
+    def addActionButton(self, action_name: str, action_text: str):
+        """Add action button"""
+        action_btn = QPushButton(action_text)
+        action_btn.clicked.connect(
+            lambda: self.action_clicked.emit(action_name))
+
+        self._actions.append((action_name, action_btn))
+        self.actions_layout.addWidget(action_btn)
+
+    def _close_info_bar(self):
+        """Close info bar"""
+        self.closed.emit()
+        self.deleteLater()
 
 
-class FluentPivot(QWidget):
-    """Fluent Design style pivot (horizontal tab navigation)"""
+class FluentPivot(FluentLayoutBase):
+    """Enhanced Fluent Design style pivot (horizontal tab navigation)"""
 
     selection_changed = Signal(int)  # Selected index
 
@@ -581,15 +493,11 @@ class FluentPivot(QWidget):
 
         self._items = []
         self._selected_index = 0
-        self._content_widget = None
 
-        self._setup_ui()
-        self._setup_style()
+        self._setup_pivot_ui()
 
-        theme_manager.theme_changed.connect(self._on_theme_changed)
-
-    def _setup_ui(self):
-        """Setup UI"""
+    def _setup_pivot_ui(self):
+        """Setup pivot UI"""
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
@@ -600,7 +508,6 @@ class FluentPivot(QWidget):
         self.header_layout = QHBoxLayout(self.header)
         self.header_layout.setContentsMargins(16, 0, 16, 0)
         self.header_layout.setSpacing(0)
-
         self.header_layout.addStretch()
 
         # Content area
@@ -608,6 +515,42 @@ class FluentPivot(QWidget):
 
         self.main_layout.addWidget(self.header)
         self.main_layout.addWidget(self.content_stack, 1)
+
+    def _apply_custom_theme_tokens(self, tokens):
+        """Apply pivot-specific theme tokens"""
+        super()._apply_custom_theme_tokens(tokens)
+        self._apply_pivot_styling()
+
+    def _apply_pivot_styling(self):
+        """Apply pivot styling"""
+        if not theme_manager:
+            return
+
+        style_sheet = f"""
+            QFrame {{
+                background-color: {theme_manager.get_color('surface').name()};
+                border-bottom: 1px solid {theme_manager.get_color('border').name()};
+            }}
+            QPushButton {{
+                background-color: transparent;
+                color: {theme_manager.get_color('text_secondary').name()};
+                border: none;
+                border-bottom: 3px solid transparent;
+                padding: 12px 16px;
+                font-size: 14px;
+                font-weight: 500;
+            }}
+            QPushButton:checked {{
+                color: {theme_manager.get_color('primary').name()};
+                border-bottom: 3px solid {theme_manager.get_color('primary').name()};
+                font-weight: 600;
+            }}
+            QPushButton:hover:!checked {{
+                color: {theme_manager.get_color('text_primary').name()};
+                background-color: {theme_manager.get_color('accent_light').name()};
+            }}
+        """
+        self.setStyleSheet(style_sheet)
 
     def addItem(self, text: str, widget: Optional[QWidget] = None) -> int:
         """Add pivot item"""
@@ -663,38 +606,3 @@ class FluentPivot(QWidget):
 
         self._selected_index = index
         self.selection_changed.emit(index)
-
-    def _setup_style(self):
-        """Setup style"""
-        theme = theme_manager
-
-        style_sheet = f"""
-            QFrame {{
-                background-color: {theme.get_color('surface').name()};
-                border-bottom: 1px solid {theme.get_color('border').name()};
-            }}
-            QPushButton {{
-                background-color: transparent;
-                color: {theme.get_color('text_secondary').name()};
-                border: none;
-                border-bottom: 3px solid transparent;
-                padding: 12px 16px;
-                font-size: 14px;
-                font-weight: 500;
-            }}
-            QPushButton:checked {{
-                color: {theme.get_color('primary').name()};
-                border-bottom: 3px solid {theme.get_color('primary').name()};
-                font-weight: 600;
-            }}
-            QPushButton:hover:!checked {{
-                color: {theme.get_color('text_primary').name()};
-                background-color: {theme.get_color('accent_light').name()};
-            }}
-        """
-
-        self.setStyleSheet(style_sheet)
-
-    def _on_theme_changed(self, _):
-        """Handle theme change"""
-        self._setup_style()

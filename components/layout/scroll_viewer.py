@@ -153,7 +153,7 @@ class FluentScrollBar(QScrollBar):
     opacity = property(get_opacity, set_opacity)
 
 
-class FluentScrollViewer(QScrollArea, FluentControlBase, FluentThemeAware):
+class FluentScrollViewer(FluentControlBase):
     """
     A custom scroll container with Fluent Design styling.
 
@@ -166,8 +166,6 @@ class FluentScrollViewer(QScrollArea, FluentControlBase, FluentThemeAware):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        FluentControlBase.__init__(self)
-        FluentThemeAware.__init__(self)
 
         self._smooth_scrolling = True
         self._auto_hide_scrollbars = True

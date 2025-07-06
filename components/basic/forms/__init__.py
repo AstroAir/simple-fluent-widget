@@ -18,6 +18,8 @@ from .toggle import *
 from .numberbox import *
 from .autosuggestbox import *
 from .passwordbox import *
+from .radio import *
+from .searchbox import *
 
 __all__ = [
     # Export all form control classes and functions
