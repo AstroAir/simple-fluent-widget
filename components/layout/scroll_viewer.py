@@ -28,10 +28,7 @@ class FluentScrollBar(QScrollBar):
         self._is_hovered = False
         self._theme = {}
 
-        self.setFixedWidth(12 if orientation ==
-                           Qt.Orientation.Vertical else 12)
-        self.setFixedHeight(12 if orientation ==
-                            Qt.Orientation.Horizontal else 12)
+        self.setFixedSize(12, 12)
 
         # Auto-hide timer
         self._hide_timer = QTimer()
@@ -153,7 +150,9 @@ class FluentScrollBar(QScrollBar):
     opacity = property(get_opacity, set_opacity)
 
 
-class FluentScrollViewer(FluentControlBase):
+from PySide6.QtWidgets import QScrollArea
+
+class FluentScrollViewer(QScrollArea, FluentControlBase):
     """
     A custom scroll container with Fluent Design styling.
 
@@ -165,7 +164,8 @@ class FluentScrollViewer(FluentControlBase):
     scroll_changed = Signal(int, int)  # horizontal, vertical positions
 
     def __init__(self, parent: Optional[QWidget] = None):
-        super().__init__(parent)
+        QScrollArea.__init__(self, parent)
+        FluentControlBase.__init__(self, parent)
 
         self._smooth_scrolling = True
         self._auto_hide_scrollbars = True
@@ -338,25 +338,66 @@ class FluentScrollViewer(FluentControlBase):
 
     def apply_theme(self):
         """Apply the current theme to the scroll viewer."""
-        theme = self.get_current_theme()
-        if not theme:
+        # 兼容 FluentThemeAware 或 FluentControlBase 的 get_current_theme
+        get_theme = getattr(self, "get_current_theme", None)
+        theme = get_theme() if callable(get_theme) else None
+        # 确保 theme 为 dict 类型
+        if not isinstance(theme, dict):
             return
 
-        # Update CSS variables based on theme
-        style_vars = {
-            '--scroll-background': theme.get('surface_background', 'transparent'),
-            '--scrollbar-thumb': theme.get('scrollbar_thumb', '#8a8886'),
-            '--scrollbar-thumb-hover': theme.get('scrollbar_thumb_hover', '#605e5c'),
-            '--scrollbar-thumb-pressed': theme.get('scrollbar_thumb_pressed', '#323130'),
-        }
+        # Use theme values directly in the stylesheet
+        scroll_background = theme.get('surface_background', 'transparent')
+        scrollbar_thumb = theme.get('scrollbar_thumb', '#8a8886')
+        scrollbar_thumb_hover = theme.get('scrollbar_thumb_hover', '#605e5c')
+        scrollbar_thumb_pressed = theme.get('scrollbar_thumb_pressed', '#323130')
 
-        # Apply updated styling
-        current_style = self.styleSheet()
-        for var_name, var_value in style_vars.items():
-            current_style = current_style.replace(
-                f'var({var_name}, ', f'{var_value}; /* var({var_name}, ')
-
-        self.setStyleSheet(current_style)
+        self.setStyleSheet(f"""
+            FluentScrollViewer {{
+                background-color: {scroll_background};
+                border: none;
+                border-radius: 4px;
+            }}
+            
+            FluentScrollViewer QScrollBar:vertical {{
+                background: transparent;
+                width: 12px;
+                border: none;
+            }}
+            
+            FluentScrollViewer QScrollBar:horizontal {{
+                background: transparent;
+                height: 12px;
+                border: none;
+            }}
+            
+            FluentScrollViewer QScrollBar::handle {{
+                background-color: {scrollbar_thumb};
+                border-radius: 2px;
+                min-height: 20px;
+                min-width: 20px;
+            }}
+            
+            FluentScrollViewer QScrollBar::handle:hover {{
+                background-color: {scrollbar_thumb_hover};
+            }}
+            
+            FluentScrollViewer QScrollBar::handle:pressed {{
+                background-color: {scrollbar_thumb_pressed};
+            }}
+            
+            FluentScrollViewer QScrollBar::add-line,
+            FluentScrollViewer QScrollBar::sub-line {{
+                border: none;
+                background: none;
+                width: 0px;
+                height: 0px;
+            }}
+            
+            FluentScrollViewer QScrollBar::add-page,
+            FluentScrollViewer QScrollBar::sub-page {{
+                background: none;
+            }}
+        """)
 
         # Update custom scrollbars
         if hasattr(self, '_v_scrollbar'):
