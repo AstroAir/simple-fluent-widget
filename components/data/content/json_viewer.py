@@ -5,27 +5,21 @@ Advanced JSON viewing and editing components that follow the Fluent Design Syste
 Includes syntax highlighting, tree view, and validation with modern Python features.
 """
 
-import sys
-import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Dict, List, Union, Optional, Protocol, TypeAlias, Final
-from functools import cached_property, lru_cache
 from contextlib import contextmanager
-from weakref import WeakSet
 
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
+from PySide6.QtWidgets import (QWidget,
                                QTreeWidget, QTreeWidgetItem,
-                               QPushButton, QLabel, QLineEdit,
-                               QHeaderView, QTabWidget, QApplication)
-from PySide6.QtCore import Qt, Signal, QTimer, QPropertyAnimation, QEasingCurve, Property
+                               QHeaderView)
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import (QFont, QColor, QSyntaxHighlighter,
-                           QTextDocument, QTextCharFormat, QAction)
+                           QTextDocument, QTextCharFormat)
 
 # Import enhanced components
-from core.theme import theme_manager, ThemeMode
-from core.enhanced_base import FluentLayoutBuilder, FluentStandardButton
+from core.theme import theme_manager
 
 
 # Type aliases for better readability
@@ -140,13 +134,23 @@ class OptimizedJsonSyntaxHighlighter(QSyntaxHighlighter):
 
             self._formats[rule] = fmt
 
-    @lru_cache(maxsize=128)
-    def _find_string_positions(self, text: str) -> tuple[tuple[int, int], ...]:
+    # Fix: Changed return type hint to match the cache type
+    def _find_string_positions(self, text: str) -> List[tuple[int, int]]:
         """Find string positions with caching"""
+        # Check cache first
+        # Fix: Return the list directly from the cache
+        if text in self._string_positions_cache:
+            return self._string_positions_cache[text]
+
         positions = []
         for match in self._patterns[JsonHighlightRule.STRING].finditer(text):
             positions.append(match.span())
-        return tuple(positions)
+
+        # Store in cache
+        # Fix: Store the list directly in the cache
+        self._string_positions_cache[text] = positions
+        # Fix: Return the list directly
+        return positions
 
     def _is_in_string(self, text: str, position: int) -> bool:
         """Optimized check if position is inside a string"""
@@ -233,14 +237,14 @@ class OptimizedJsonTreeWidget(QTreeWidget):
         self.itemClicked.connect(self._on_item_clicked)
         self.itemDoubleClicked.connect(self._on_item_double_clicked)
 
-    def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
+    def _on_item_clicked(self, item: QTreeWidgetItem):
         """Handle item click"""
         if item:
             path = self._get_item_path(item)
             value = item.data(0, Qt.ItemDataRole.UserRole)
             self.item_selected.emit(path, value)
 
-    def _on_item_double_clicked(self, item: QTreeWidgetItem, column: int):
+    def _on_item_double_clicked(self, item: QTreeWidgetItem):
         """Handle item double click"""
         if item:
             path = self._get_item_path(item)
